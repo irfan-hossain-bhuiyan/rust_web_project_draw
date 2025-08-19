@@ -4,21 +4,14 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Collaborative Pixel Canvas</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: Arial, sans-serif;
-            background-color: #f0f0f0;
-        }
-    </style>
-<link rel="modulepreload" href="/rust_web-6b0fea3954afd032.js" crossorigin="anonymous" integrity="sha384-LUJHBTfve18Pj7Se+QtqY+xG5nqmIiYeMaZ8FBiqHr9F3nFwNNwPVA5OKhW2cPar"><link rel="preload" href="/rust_web-6b0fea3954afd032_bg.wasm" crossorigin="anonymous" integrity="sha384-U6+YOJAIt2RYpA/2789TknJ6fU2fWuEG8wa7roRc1GrkfEMfn28UlFSLYews4hQd" as="fetch" type="application/wasm"></head>
+    <link rel="stylesheet" href="/styles-f4eb84735ddcd90b.css" integrity="sha384-WX1zaHX7XpUrfoATviFyPFQ4YVWAgXgMKdsZxVheKwr93S3Ddcywvsa+iuZnBZA+"/>
+<link rel="modulepreload" href="/rust_web-e89f52d014c191f0.js" crossorigin="anonymous" integrity="sha384-VCXEYaAvN0/HiVeYaS6Vt9cHKyGTQY5z/fkWZtjzdjn9sHpeR+dBMWNgEXbB3qAi"><link rel="preload" href="/rust_web-e89f52d014c191f0_bg.wasm" crossorigin="anonymous" integrity="sha384-dvqcdj015krER3oEGYUabaP55hwRYGetVmK0ZvxnyqJGgFoXMY5ehxeWWmVJ9vPq" as="fetch" type="application/wasm"></head>
 <body>
     <div id="app"></div>
 
 <script type="module">
-import init, * as bindings from '/rust_web-6b0fea3954afd032.js';
-const wasm = await init({ module_or_path: '/rust_web-6b0fea3954afd032_bg.wasm' });
+import init, * as bindings from '/rust_web-e89f52d014c191f0.js';
+const wasm = await init({ module_or_path: '/rust_web-e89f52d014c191f0_bg.wasm' });
 
 
 window.wasmBindings = bindings;

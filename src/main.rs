@@ -4,13 +4,13 @@ mod components;
 mod types;
 mod services;
 
+use components::Canvas;
+
 #[component]
 fn App() -> impl IntoView {
     view! {
-        <div>
-            <h1>"Hello, Leptos World!"</h1>
-            <p>"Welcome to the Collaborative Pixel Canvas"</p>
-            <div>"Ready to start building!"</div>
+        <div class="app">
+            <Canvas />
         </div>
     }
 }

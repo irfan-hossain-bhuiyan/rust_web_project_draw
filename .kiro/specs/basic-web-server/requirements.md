@@ -49,6 +49,7 @@ This feature involves creating a collaborative pixel canvas web application usin
 2. WHEN creating modules THEN the system SHALL follow Rust naming conventions (snake_case for files/functions, PascalCase for components and types)
 3. WHEN structuring the project THEN the system SHALL use separate files for each major component
 4. WHEN defining modules THEN the system SHALL use proper visibility modifiers (pub/private)
+5. WHEN styling the application THEN the system SHALL keep all CSS in separate CSS files, not inline styles
 
 ### Requirement 5
 

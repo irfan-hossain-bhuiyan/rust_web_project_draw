@@ -3,8 +3,62 @@
 body {
     margin: 0;
     padding: 0;
-    font-family: Arial, sans-serif;
-    background-color: #f0f0f0;
+    font-family: 'Arial', sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
 }
 
-/* Basic styling - will be expanded in later tasks */
+
+/* Canvas Container */
+.canvas-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: white;
+    border-radius: 15px;
+    padding: 30px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    border: 2px solid #e0e0e0;
+}
+
+/* Canvas Title */
+.canvas-title {
+    margin: 0 0 25px 0;
+    font-size: 28px;
+    font-weight: bold;
+    color: #333;
+    text-align: center;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* Canvas Grid */
+.canvas-grid {
+    display: grid;
+    grid-template-columns: repeat(1000, 10px);
+    grid-template-rows: repeat(1000, 10px);
+    gap: 1px;
+    background-color: #ddd;
+    border: 3px solid #333;
+    border-radius: 8px;
+    padding: 5px;
+}
+
+/* Individual Pixels */
+.pixel {
+    width: 10px;
+    height: 10px;
+    background-color: white;
+    border: 1px solid #ccc;
+    cursor: pointer;
+    transition: all 0.1s ease;
+}
+
+.pixel:hover {
+    background-color: #f0f0f0;
+    border-color: #999;
+    transform: scale(1.1);
+}
