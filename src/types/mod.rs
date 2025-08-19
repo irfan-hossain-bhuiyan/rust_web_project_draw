@@ -1,1 +1,1 @@
-// Types module
+pub mod pixel_canvas;
