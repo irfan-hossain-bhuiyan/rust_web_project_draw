@@ -1,4 +1,3 @@
-// This can be empty for now or contain server-side code if you plan to use SSR later
 use leptos::prelude::*;
 
 mod components;

@@ -1,0 +1,9 @@
+# leptos_config.toml
+[serve]
+site-root = "target/site"
+site-pkg-dir = "pkg"
+site-addr = "127.0.0.1:8080"
+open = false
+
+[build]
+target = "index.html"
