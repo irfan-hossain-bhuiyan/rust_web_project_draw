@@ -4,9 +4,8 @@ use leptos::prelude::*;
 mod components;
 mod types;
 mod services;
-mod prelude;
 use components::Canvas;
-
+pub use rust_web::prelude;
 #[component]
 fn App() -> impl IntoView {
     view! {

@@ -32,6 +32,7 @@ pub fn Canvas() -> impl IntoView {
 
     // Mouse interaction state
     let is_dragging = RwSignal::new(false);
+    let mouse_position = RwSignal::new(None::<(f64, f64)>);
 
     //region input handler
     //region handle keyboard
@@ -85,6 +86,9 @@ pub fn Canvas() -> impl IntoView {
     };
 
     let handle_mousemove = move |ev: web_sys::MouseEvent| {
+        // Always track mouse position for hover effects
+        mouse_position.set(Some((ev.client_x() as f64, ev.client_y() as f64)));
+        
         if is_dragging.get() {
             let delta_x = ev.movement_x() as f64;
             let delta_y = ev.movement_y() as f64;
@@ -96,6 +100,11 @@ pub fn Canvas() -> impl IntoView {
 
             ev.prevent_default();
         }
+    };
+
+    let handle_mouseleave = move |_ev: web_sys::MouseEvent| {
+        // Clear mouse position when mouse leaves canvas
+        mouse_position.set(None);
     };
 
     let handle_wheel = move |ev: web_sys::WheelEvent| {
@@ -141,12 +150,24 @@ pub fn Canvas() -> impl IntoView {
         context.set_fill_style_str(CANVAS_BACKGROUND_COLOR);
         context.fill_rect(0.0, 0.0, canvas.width() as f64, canvas.height() as f64);
 
+        // Convert mouse position to Position if available
+        let mouse_pos = mouse_position.get().map(|(x, y)| {
+            use crate::prelude::Position;
+            Position::new(x, y)
+        });
+
         // Draw the pixel canvas using its draw method
         let canvas_state = pixel_canvas.get(); // This creates the reactive dependency
-        canvas_state.draw(&context);
+        canvas_state.draw(&context, mouse_pos);
     };
-    Effect::new(move |_| if let Some(canvas) = canvas_ref.get() {
-        draw(canvas)
+    Effect::new(move |_| {
+        // Create reactive dependencies
+        let _canvas_state = pixel_canvas.get();
+        let _mouse_pos = mouse_position.get();
+        
+        if let Some(canvas) = canvas_ref.get() {
+            draw(canvas)
+        }
     });
     //endregion
     //endregion
@@ -177,6 +198,7 @@ pub fn Canvas() -> impl IntoView {
         .on(leptos::ev::mousedown, handle_mousedown)
         .on(leptos::ev::mouseup, handle_mouseup)
         .on(leptos::ev::mousemove, handle_mousemove)
+        .on(leptos::ev::mouseleave, handle_mouseleave)
         .on(leptos::ev::wheel, handle_wheel)
         .tabindex("0");
 

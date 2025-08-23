@@ -1,4 +1,4 @@
-use std::cmp::max;
+use std::{cmp::max, ops::{Index, IndexMut}};
 
 use web_sys::window;
 
@@ -40,15 +40,7 @@ impl Vec2 {
     pub fn new(x: f64, y: f64) -> Self {
         Self { x, y }
     }
-    pub fn add(self, other: Vec2) -> Self {
-        Self::new(self.x + other.x, self.y + other.y)
-    }
-    pub fn sub(self, other: Vec2) -> Self {
-        Self::new(self.x - other.x, self.y - other.y)
-    }
-    pub fn scale(self, s: f64) -> Self {
-        Self::new(self.x * s, self.y * s)
-    }
+    
     pub fn dot(self, other: Vec2) -> f64 {
         self.x * other.x + self.y * other.y
     }
@@ -60,19 +52,19 @@ impl Vec2 {
 impl std::ops::Add for Vec2 {
     type Output = Vec2;
     fn add(self, rhs: Vec2) -> Self::Output {
-        self.add(rhs)
+        Self::new(self.x + rhs.x, self.y + rhs.y)
     }
 }
 impl std::ops::Sub for Vec2 {
     type Output = Vec2;
     fn sub(self, rhs: Vec2) -> Self::Output {
-        self.sub(rhs)
+        Self::new(self.x - rhs.x, self.y - rhs.y)
     }
 }
 impl std::ops::Mul<f64> for Vec2 {
     type Output = Vec2;
     fn mul(self, rhs: f64) -> Self::Output {
-        self.scale(rhs)
+        Self::new(self.x * rhs, self.y * rhs)
     }
 }
 /// 2D position coordinates (newtype over Vec2)
@@ -298,5 +290,120 @@ impl Rectangle {
         let ul = self.ratio_of(rect.ul);
         let dr = self.ratio_of(rect.dr);
         unsafe { Rectangle::from_ul_dr_unchecked(ul, dr) }
+    }
+}
+
+
+use bitvec::prelude::*;
+
+pub struct BitMatrix {
+    width: usize,
+    height: usize,
+    data: BitVec,  // default Lsb0, usize store
+}
+
+impl BitMatrix {
+    /// Create a new matrix of the specified dimensions, initialized with `initial` boolean.
+    pub fn new(width: usize, height: usize, initial: bool) -> Self {
+        let mut data = BitVec::with_capacity(width * height);
+        data.resize(width * height, initial);
+        BitMatrix { width, height, data }
+    }
+    
+    /// Returns (width, height)
+    pub fn dimensions(&self) -> (usize, usize) {
+        (self.width, self.height)
+    }
+    
+    /// Convert (x, y) to linear index
+    fn idx(&self, x: usize, y: usize) -> Option<usize> {
+        if x < self.width && y < self.height {
+            Some(y * self.width + x)
+        } else {
+            None
+        }
+    }
+    fn idx_unchecked(&self,x:usize,y:usize) ->usize{
+        y*self.width+x
+    }
+    
+    /// Get the value at (x, y). Returns Some(bool) or None if out-of-bounds.
+    pub fn get(&self, x: usize, y: usize) -> Option<bool> {
+        self.idx(x, y).map(|i| self.data[i])
+    }
+    
+    /// Set the value at (x, y) to `value`, returns true if successful.
+    pub fn set(&mut self, x: usize, y: usize, value: bool) -> bool {
+        if let Some(i) = self.idx(x, y) {
+            self.data.set(i, value);
+            true
+        } else {
+            false
+        }
+    }
+    
+    /// Clear all bits to false
+    pub fn clear(&mut self) {
+        self.data.fill(false);
+    }
+    
+    /// Count number of true bits
+    pub fn count_ones(&self) -> usize {
+        self.data.count_ones()
+    }
+    
+    /// Iterate over rows as slices of bool
+    pub fn row(&self, y: usize) -> Option<impl Iterator<Item=bool> + '_> {
+        if y < self.height {
+            let start = y * self.width;
+            let end = start + self.width;
+            let slice = &self.data[start..end];
+            Some(slice.iter().by_vals())
+        } else {
+            None
+        }
+    }
+}
+
+impl Index<(usize, usize)> for BitMatrix {
+    type Output = bool;
+    fn index(&self, index: (usize, usize)) -> &Self::Output {
+        let (x, y) = index;
+        // BitVec supports indexing to &bool
+        &self.data[self.idx_unchecked(x, y)]
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn basic_usage() {
+        let mut m = BitMatrix::new(4, 3, false);
+        assert_eq!(m.dimensions(), (4,3));
+        assert_eq!(m.count_ones(), 0);
+        assert_eq!(m.get(2,1), Some(false));
+        assert!(m.set(2,1, true));
+        assert_eq!(m.get(2,1), Some(true));
+        assert_eq!(m.count_ones(), 1);
+
+        // out-of-bounds
+        assert_eq!(m.get(10,10), None);
+        assert!(!m.set(10,0, true));
+
+        // clear
+        m.clear();
+        assert_eq!(m.count_ones(), 0);
+
+        // row iteration
+        m.set(0,2, true);
+        if let Some(row2) = m.row(2) {
+            let v: Vec<bool> = row2.collect();
+            assert_eq!(v, vec![true, false, false, false]);
+        } else {
+            panic!("row should exist");
+        }
     }
 }

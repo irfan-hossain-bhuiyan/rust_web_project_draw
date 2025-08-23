@@ -1,5 +1,3 @@
-use std::convert::Into;
-
 use web_sys::CanvasRenderingContext2d;
 
 use crate::prelude::{get_window_rect, get_window_size, Position, RectSize, Rectangle, Vec2};
@@ -9,7 +7,8 @@ pub const PIXEL_SIZE: f64 = 30.0;
 pub const GAP: f64 = 4.0;
 pub const BORDER_RADIUS: f64 = 5.0;
 pub const GRID_SIZE: usize = 100;
-pub const PIXEL_FILL_COLOR: &str = "#eeeeee";
+pub const PIXEL_FILL_COLOR: &str = "#dddddd";
+pub const PIXEL_HOVER_COLOR: &str = "#bbbbbb";
 pub const PIXEL_STROKE_COLOR: &str = "#111111";
 pub const PIXEL_LINE_WIDTH: f64 = 1.0;
 pub const CANVAS_BACKGROUND_COLOR: &str = "#f0f0f0";
@@ -61,16 +60,16 @@ impl PixelCanvas {
     fn clamp_position(&mut self) {
         let max_pos = Position::zero();
         let min_pos = Position::from(get_window_size().into_vec2() - self.get_size().into_vec2());
-        let min_pos = min_pos.pos_clamp(max_pos, false, false); 
-        self.position = self.position.rect_clamp(
-            unsafe{Rectangle::from_ul_dr_unchecked(min_pos, max_pos)}
-            );
+        let min_pos = min_pos.pos_clamp(max_pos, false, false);
+        self.position = self
+            .position
+            .rect_clamp(unsafe { Rectangle::from_ul_dr_unchecked(min_pos, max_pos) });
     }
     pub fn get_rect(&self) -> Rectangle {
         Rectangle::from_pos_size(self.position, self.get_size())
     }
     /// Draw the pixel canvas grid
-    pub fn draw(&self, context: &CanvasRenderingContext2d) {
+    pub fn draw(&self, context: &CanvasRenderingContext2d, mouse_pos: Option<Position>) {
         // Apply zoom transformations
         let scaled_pixel_size = PIXEL_SIZE * self.zoom;
         let scaled_gap = GAP * self.zoom;
@@ -78,6 +77,10 @@ impl PixelCanvas {
         // Set up stroke properties once
         context.set_stroke_style_str(PIXEL_STROKE_COLOR);
         context.set_line_width(PIXEL_LINE_WIDTH);
+
+        // Calculate hovered pixel if mouse position is provided
+        let hovered_grid = mouse_pos.map(|pos| self.closest_grid_index_from_point(pos));
+
         let (index_ul, index_dr) = self.viewed_row_coloumed();
         // Draw grid
         for row in index_ul.y..index_dr.y {
@@ -85,8 +88,18 @@ impl PixelCanvas {
                 let x = self.position.x() + (col as f64) * (scaled_pixel_size + scaled_gap);
                 let y = self.position.y() + (row as f64) * (scaled_pixel_size + scaled_gap);
 
-                // Set fill color
-                context.set_fill_style_str(PIXEL_FILL_COLOR);
+                // Set fill color based on whether this pixel is hovered
+                let is_hovered = hovered_grid
+                    .as_ref()
+                    .map(|grid| grid.x == col && grid.y == row)
+                    .unwrap_or(false);
+
+                let fill_color = if is_hovered {
+                    PIXEL_HOVER_COLOR
+                } else {
+                    PIXEL_FILL_COLOR
+                };
+                context.set_fill_style_str(fill_color);
 
                 // Draw filled rounded rectangle
                 self.draw_rounded_rect(
@@ -123,8 +136,8 @@ impl PixelCanvas {
 
     /// Set position
     fn zoom_clamp(&mut self) {
-        const ZOOM_MAX: f64 = 5.0;
-        const ZOOM_MIN: f64 = 0.1;
+        const ZOOM_MAX: f64 = 2.0;
+        const ZOOM_MIN: f64 = 0.6;
         self.zoom = self.zoom.clamp(ZOOM_MIN, ZOOM_MAX);
     }
     /// Set zoom level
@@ -165,7 +178,7 @@ impl PixelCanvas {
         let width = (GRID_SIZE as f64) * (PIXEL_SIZE + GAP);
         let height = (GRID_SIZE as f64) * (PIXEL_SIZE + GAP);
 
-        unsafe{RectSize::new_unchecked(width, height)}
+        unsafe { RectSize::new_unchecked(width, height) }
     }
     fn viewed_row_coloumed(&self) -> (GridIndex, GridIndex) {
         let win_rect = get_window_rect();
@@ -180,5 +193,12 @@ impl PixelCanvas {
             y: (relative_rectangle.dr().y() * GRID_SIZE as f64).ceil() as usize,
         };
         (grid_index_ul, grid_index_dr)
+    }
+    fn closest_grid_index_from_point(&self, pos: Position) -> GridIndex {
+        let relative_pos = self.get_rect().ratio_of(pos).0;
+        GridIndex {
+            x: (GRID_SIZE as f64 * relative_pos.x).floor() as usize,
+            y: (GRID_SIZE as f64 * relative_pos.y).floor() as usize,
+        }
     }
 }
