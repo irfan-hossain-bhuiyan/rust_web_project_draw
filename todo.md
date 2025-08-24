@@ -11,15 +11,17 @@ Or make a function that will return delta x and delta y,that logic can be moved 
 - adding black indicator to now what what function I can color.
 - fix zooming
 - color the pixel somewhat greyish
-## Working:
-## Todo:
-- having a over pop menu that will give list of tools to use
 - import betset and have a 2d vector with it,
 - VIP:change the undo button from u to shift U,everytime I press enter,I go to that.
+## Working:
+- having a over pop menu that will give list of tools to use
+- having smooth scrolling
+## Todo:
+- As for simplicity use axum and every time it loads entire bitset from the server and render it
+    Input from the browser will pass as lineDraw,
 - also code for boundary,canvas not to draw edge of the canvas
     - make position bounded.let not it br any positive value.
 - color the background somewhat gradient.
-- having smooth scrolling
 
 
 

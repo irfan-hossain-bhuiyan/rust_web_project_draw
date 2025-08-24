@@ -1,13 +1,11 @@
 use leptos::html;
 use leptos::prelude::*;
-use leptos::view;
 use leptos::{ev, leptos_dom::helpers::window_event_listener};
 use wasm_bindgen::JsCast;
-use web_sys::UiEvent;
-use web_sys::{window, CanvasRenderingContext2d, HtmlCanvasElement};
+use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
 
 use crate::prelude::RectSize;
-use crate::types::pixel_canvas::{PixelCanvas, CANVAS_BACKGROUND_COLOR};
+use crate::types::pixel_canvas::{PixelCanvas, CANVAS_BACKGROUND_COLOR, GridIndex};
 
 
 
@@ -30,9 +28,17 @@ pub fn Canvas() -> impl IntoView {
     // Create RwSignal for pixel canvas state
     let pixel_canvas = RwSignal::new(PixelCanvas::default());
 
+    // Drawing state enum
+    #[derive(Clone, Debug)]
+    enum DrawingState {
+        NotClicked,
+        Clicked { last_position: GridIndex },
+    }
+
     // Mouse interaction state
     let is_dragging = RwSignal::new(false);
     let mouse_position = RwSignal::new(None::<(f64, f64)>);
+    let drawing_state = RwSignal::new(DrawingState::NotClicked);
 
     //region input handler
     //region handle keyboard
@@ -71,24 +77,51 @@ pub fn Canvas() -> impl IntoView {
     //endregion
     //region handle mouse
     let handle_mousedown = move |ev: web_sys::MouseEvent| {
-        if ev.button() == 1 {
-            // Middle mouse button
-            is_dragging.set(true);
-            ev.prevent_default();
+        match ev.button() {
+            1 => {
+                // Middle mouse button - panning
+                is_dragging.set(true);
+                ev.prevent_default();
+            }
+            0 => {
+                // Left mouse button - drawing
+                let mouse_x = ev.client_x() as f64;
+                let mouse_y = ev.client_y() as f64;
+                
+                pixel_canvas.with(|pc| {
+                    let pos = crate::prelude::Position::new(mouse_x, mouse_y);
+                    let grid_pos = pc.closest_grid_index_from_point(pos);
+                    drawing_state.set(DrawingState::Clicked { last_position: grid_pos });
+                });
+                
+                ev.prevent_default();
+            }
+            _ => {} // Ignore other mouse buttons
         }
     };
     let handle_mouseup = move |ev: web_sys::MouseEvent| {
-        if ev.button() == 1 {
-            // Middle mouse button
-            is_dragging.set(false);
-            ev.prevent_default();
+        match ev.button() {
+            1 => {
+                // Middle mouse button - stop panning
+                is_dragging.set(false);
+                ev.prevent_default();
+            }
+            0 => {
+                // Left mouse button - stop drawing
+                drawing_state.set(DrawingState::NotClicked);
+                ev.prevent_default();
+            }
+            _ => {} // Ignore other mouse buttons
         }
     };
 
     let handle_mousemove = move |ev: web_sys::MouseEvent| {
         // Always track mouse position for hover effects
-        mouse_position.set(Some((ev.client_x() as f64, ev.client_y() as f64)));
+        let mouse_x = ev.client_x() as f64;
+        let mouse_y = ev.client_y() as f64;
+        mouse_position.set(Some((mouse_x, mouse_y)));
         
+        // Handle panning (middle mouse drag)
         if is_dragging.get() {
             let delta_x = ev.movement_x() as f64;
             let delta_y = ev.movement_y() as f64;
@@ -98,6 +131,33 @@ pub fn Canvas() -> impl IntoView {
                 pc.y_shift(delta_y);
             });
 
+            ev.prevent_default();
+        }
+        
+        // Handle drawing (left mouse drag)
+        else if let DrawingState::Clicked { last_position } = drawing_state.get() {
+            let pos = crate::prelude::Position::new(mouse_x, mouse_y);
+            
+            pixel_canvas.update(|pc| {
+                let current_pos = pc.closest_grid_index_from_point(pos);
+                
+                // Draw line from last position to current position
+                pc.line_draw(
+                    last_position.x, 
+                    last_position.y, 
+                    current_pos.x, 
+                    current_pos.y, 
+                    true // black color
+                );
+            });
+            
+            // Update last position for next draw
+            pixel_canvas.with(|pc| {
+                let pos = crate::prelude::Position::new(mouse_x, mouse_y);
+                let current_pos = pc.closest_grid_index_from_point(pos);
+                drawing_state.set(DrawingState::Clicked { last_position: current_pos });
+            });
+            
             ev.prevent_default();
         }
     };
@@ -164,6 +224,7 @@ pub fn Canvas() -> impl IntoView {
         // Create reactive dependencies
         let _canvas_state = pixel_canvas.get();
         let _mouse_pos = mouse_position.get();
+        let _drawing_state = drawing_state.get(); // Add drawing state as dependency
         
         if let Some(canvas) = canvas_ref.get() {
             draw(canvas)

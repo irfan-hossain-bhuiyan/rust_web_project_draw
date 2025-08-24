@@ -1,6 +1,6 @@
 use web_sys::CanvasRenderingContext2d;
 
-use crate::prelude::{get_window_rect, get_window_size, Position, RectSize, Rectangle, Vec2};
+use crate::prelude::{get_window_rect, get_window_size, Position, RectSize, Rectangle, Vec2, DrawingPixelCanvas};
 
 // Constants for pixel canvas styling
 pub const PIXEL_SIZE: f64 = 30.0;
@@ -26,6 +26,8 @@ pub struct PixelCanvas {
     //limited by bound checking
     /// Zoom level (1.0 = normal, 2.0 = 2x zoom, etc.)
     zoom: f64,
+    /// Drawing canvas for pixel data
+    drawing_canvas: DrawingPixelCanvas,
 }
 
 impl Default for PixelCanvas {
@@ -33,6 +35,7 @@ impl Default for PixelCanvas {
         Self {
             position: Position::new(-20.0, -20.0),
             zoom: 1.0,
+            drawing_canvas: DrawingPixelCanvas::new(GRID_SIZE, GRID_SIZE),
         }
     }
 }
@@ -43,7 +46,23 @@ impl PixelCanvas {
         Self {
             position: Position::new(x, y),
             zoom,
+            drawing_canvas: DrawingPixelCanvas::new(GRID_SIZE, GRID_SIZE),
         }
+    }
+
+    /// Get mutable reference to drawing canvas
+    pub fn drawing_canvas_mut(&mut self) -> &mut DrawingPixelCanvas {
+        &mut self.drawing_canvas
+    }
+
+    /// Get reference to drawing canvas
+    pub fn drawing_canvas(&self) -> &DrawingPixelCanvas {
+        &self.drawing_canvas
+    }
+
+    /// Implement lineDraw for PixelCanvas as requested
+    pub fn line_draw(&mut self, x0: usize, y0: usize, x1: usize, y1: usize, black: bool) {
+        self.drawing_canvas.draw_line(x0, y0, x1, y1, black);
     }
     pub fn set_position(&mut self, x: f64, y: f64) {
         self.position = Position::new(x, y);
@@ -88,13 +107,18 @@ impl PixelCanvas {
                 let x = self.position.x() + (col as f64) * (scaled_pixel_size + scaled_gap);
                 let y = self.position.y() + (row as f64) * (scaled_pixel_size + scaled_gap);
 
-                // Set fill color based on whether this pixel is hovered
+                // Set fill color based on whether this pixel is hovered and pixel data
                 let is_hovered = hovered_grid
                     .as_ref()
                     .map(|grid| grid.x == col && grid.y == row)
                     .unwrap_or(false);
 
-                let fill_color = if is_hovered {
+                // Check if this pixel is black in the drawing canvas
+                let is_black_pixel = self.drawing_canvas.get_array().get(col, row).unwrap_or(false);
+
+                let fill_color = if is_black_pixel {
+                    "#000000" // Black pixel
+                } else if is_hovered {
                     PIXEL_HOVER_COLOR
                 } else {
                     PIXEL_FILL_COLOR
@@ -194,7 +218,7 @@ impl PixelCanvas {
         };
         (grid_index_ul, grid_index_dr)
     }
-    fn closest_grid_index_from_point(&self, pos: Position) -> GridIndex {
+    pub fn closest_grid_index_from_point(&self, pos: Position) -> GridIndex {
         let relative_pos = self.get_rect().ratio_of(pos).0;
         GridIndex {
             x: (GRID_SIZE as f64 * relative_pos.x).floor() as usize,
