@@ -4,13 +4,20 @@ use leptos::prelude::*;
 mod components;
 mod types;
 mod services;
-use components::Canvas;
+use components::{Canvas, Toolbar, DrawingTool};
 pub use rust_web::prelude;
+
+use crate::components::toolbar::ToolbarWithTrigger;
+
 #[component]
 fn App() -> impl IntoView {
+    // Shared state for the selected drawing tool
+    let selected_tool = RwSignal::new(DrawingTool::default());
+    
     view! {
         <div class="app">
-            <Canvas />
+            <ToolbarWithTrigger selected_tool=selected_tool />
+            <Canvas selected_tool=selected_tool />
         </div>
     }
 }

@@ -4,10 +4,8 @@ use leptos::{ev, leptos_dom::helpers::window_event_listener};
 use wasm_bindgen::JsCast;
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
 
-use crate::prelude::RectSize;
 use crate::types::pixel_canvas::{PixelCanvas, CANVAS_BACKGROUND_COLOR, GridIndex};
-
-
+use crate::components::DrawingTool;
 
 /// Get Canvas2D rendering context from canvas element
 fn get_canvas_2d_context(canvas: &HtmlCanvasElement) -> Result<CanvasRenderingContext2d, String> {
@@ -22,7 +20,9 @@ fn get_canvas_2d_context(canvas: &HtmlCanvasElement) -> Result<CanvasRenderingCo
 /// Get window dimensions with fallback defaults
 
 #[component]
-pub fn Canvas() -> impl IntoView {
+pub fn Canvas(
+    #[prop(into)] selected_tool: RwSignal<DrawingTool>,
+) -> impl IntoView {
     let canvas_ref = NodeRef::<html::Canvas>::new();
 
     // Create RwSignal for pixel canvas state
@@ -84,7 +84,7 @@ pub fn Canvas() -> impl IntoView {
                 ev.prevent_default();
             }
             0 => {
-                // Left mouse button - drawing
+                // Left mouse button - drawing/erasing
                 let mouse_x = ev.client_x() as f64;
                 let mouse_y = ev.client_y() as f64;
                 
@@ -134,21 +134,24 @@ pub fn Canvas() -> impl IntoView {
             ev.prevent_default();
         }
         
-        // Handle drawing (left mouse drag)
-        else if let DrawingState::Clicked { last_position } = drawing_state.get() {
-            let pos = crate::prelude::Position::new(mouse_x, mouse_y);
+        // Handle drawing during mouse movement
+        if let DrawingState::Clicked { last_position } = drawing_state.get() {
+            let current_tool = selected_tool.get();
             
             pixel_canvas.update(|pc| {
+                let pos = crate::prelude::Position::new(mouse_x, mouse_y);
                 let current_pos = pc.closest_grid_index_from_point(pos);
                 
-                // Draw line from last position to current position
-                pc.line_draw(
-                    last_position.x, 
-                    last_position.y, 
-                    current_pos.x, 
-                    current_pos.y, 
-                    true // black color
-                );
+                match current_tool {
+                    DrawingTool::Pen => {
+                        // Draw line from last position to current position
+                        pc.line_draw(last_position, current_pos,true);
+                    }
+                    DrawingTool::Eraser => {
+                        // Erase line from last position to current position
+                        pc.line_draw(last_position, current_pos,false);
+                    }
+                }
             });
             
             // Update last position for next draw

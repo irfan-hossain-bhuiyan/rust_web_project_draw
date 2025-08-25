@@ -61,8 +61,8 @@ impl PixelCanvas {
     }
 
     /// Implement lineDraw for PixelCanvas as requested
-    pub fn line_draw(&mut self, x0: usize, y0: usize, x1: usize, y1: usize, black: bool) {
-        self.drawing_canvas.draw_line(x0, y0, x1, y1, black);
+    pub fn line_draw(&mut self, pos1:GridIndex,pos2:GridIndex, black: bool) {
+        self.drawing_canvas.draw_line(pos1.x, pos1.y, pos2.x, pos2.y, black);
     }
     pub fn set_position(&mut self, x: f64, y: f64) {
         self.position = Position::new(x, y);
