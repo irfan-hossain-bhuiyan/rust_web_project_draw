@@ -1,11 +1,11 @@
 // This can be empty for now or contain server-side code if you plan to use SSR later
 use leptos::prelude::*;
-
+use leptos_use::{self, use_websocket, UseWebSocketReturn};
 mod components;
 mod types;
 mod services;
 use components::{Canvas, Toolbar, DrawingTool};
-pub use rust_web::prelude;
+pub use frontend::prelude;
 
 use crate::components::toolbar::ToolbarWithTrigger;
 
@@ -13,6 +13,7 @@ use crate::components::toolbar::ToolbarWithTrigger;
 fn App() -> impl IntoView {
     // Shared state for the selected drawing tool
     let selected_tool = RwSignal::new(DrawingTool::default());
+    let UseWebSocketReturn{ ready_state, message, ws, open, close, send, .. }=use_websocket::<Vec<u8>,Vec<u8>,DummyCodec>("127.0.0.1:8081");
     
     view! {
         <div class="app">
