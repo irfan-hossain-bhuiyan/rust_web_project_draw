@@ -1,5 +1,10 @@
+use frontend::prelude::PixelColor;
 use leptos::html;
+use leptos::logging;
+use leptos::logging::error;
+use leptos::logging::log;
 use leptos::prelude::*;
+use leptos::server;
 use leptos::{ev, leptos_dom::helpers::window_event_listener};
 use wasm_bindgen::JsCast;
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
@@ -21,13 +26,11 @@ fn get_canvas_2d_context(canvas: &HtmlCanvasElement) -> Result<CanvasRenderingCo
 
 #[component]
 pub fn Canvas(
+    #[prop(into)] canvas_state: RwSignal<PixelCanvas>,
     #[prop(into)] selected_tool: RwSignal<DrawingTool>,
 ) -> impl IntoView {
     let canvas_ref = NodeRef::<html::Canvas>::new();
-
     // Create RwSignal for pixel canvas state
-    let pixel_canvas = RwSignal::new(PixelCanvas::default());
-
     // Drawing state enum
     #[derive(Clone, Debug)]
     enum DrawingState {
@@ -46,29 +49,29 @@ pub fn Canvas(
         let step = 20.0; // Movement step size
         match ev.key().as_str() {
             "ArrowLeft" => {
-                pixel_canvas.update(|pc| pc.x_shift(step));
+                canvas_state.update(|pc| pc.x_shift(step));
                 ev.prevent_default();
             }
             "ArrowRight" => {
-                pixel_canvas.update(|pc| pc.x_shift(-step));
+                canvas_state.update(|pc| pc.x_shift(-step));
                 ev.prevent_default();
             }
             "ArrowUp" => {
-                pixel_canvas.update(|pc| pc.y_shift(step));
+                canvas_state.update(|pc| pc.y_shift(step));
                 ev.prevent_default();
             }
             "ArrowDown" => {
-                pixel_canvas.update(|pc| pc.y_shift(-step));
+                canvas_state.update(|pc| pc.y_shift(-step));
                 ev.prevent_default();
             }
             "=" | "+" => {
                 // Zoom in
-                pixel_canvas.update(|pc| pc.zoom_in(1.2));
+                canvas_state.update(|pc| pc.zoom_in(1.2));
                 ev.prevent_default();
             }
             "-" => {
                 // Zoom out
-                pixel_canvas.update(|pc| pc.zoom_out(1.2));
+                canvas_state.update(|pc| pc.zoom_out(1.2));
                 ev.prevent_default();
             }
             _ => {}
@@ -88,7 +91,7 @@ pub fn Canvas(
                 let mouse_x = ev.client_x() as f64;
                 let mouse_y = ev.client_y() as f64;
                 
-                pixel_canvas.with(|pc| {
+                canvas_state.with(|pc| {
                     let pos = crate::prelude::Position::new(mouse_x, mouse_y);
                     let grid_pos = pc.closest_grid_index_from_point(pos);
                     drawing_state.set(DrawingState::Clicked { last_position: grid_pos });
@@ -126,7 +129,7 @@ pub fn Canvas(
             let delta_x = ev.movement_x() as f64;
             let delta_y = ev.movement_y() as f64;
 
-            pixel_canvas.update(|pc| {
+            canvas_state.update(|pc| {
                 pc.x_shift(delta_x);
                 pc.y_shift(delta_y);
             });
@@ -138,24 +141,24 @@ pub fn Canvas(
         if let DrawingState::Clicked { last_position } = drawing_state.get() {
             let current_tool = selected_tool.get();
             
-            pixel_canvas.update(|pc| {
+            canvas_state.update(|pc| {
                 let pos = crate::prelude::Position::new(mouse_x, mouse_y);
                 let current_pos = pc.closest_grid_index_from_point(pos);
                 
                 match current_tool {
                     DrawingTool::Pen => {
                         // Draw line from last position to current position
-                        pc.line_draw(last_position, current_pos,true);
+                        pc.line_draw(last_position, current_pos,PixelColor::BLACK);
                     }
                     DrawingTool::Eraser => {
                         // Erase line from last position to current position
-                        pc.line_draw(last_position, current_pos,false);
+                        pc.line_draw(last_position, current_pos,PixelColor::ALPHA);
                     }
                 }
             });
             
             // Update last position for next draw
-            pixel_canvas.with(|pc| {
+            canvas_state.with(|pc| {
                 let pos = crate::prelude::Position::new(mouse_x, mouse_y);
                 let current_pos = pc.closest_grid_index_from_point(pos);
                 drawing_state.set(DrawingState::Clicked { last_position: current_pos });
@@ -177,7 +180,7 @@ pub fn Canvas(
         let mouse_x = ev.client_x() as f64;
         let mouse_y = ev.client_y() as f64;
 
-        pixel_canvas.update(|pc| {
+        canvas_state.update(|pc| {
             pc.zoom_at_point(zoom_factor, mouse_x, mouse_y);
         });
 
@@ -220,12 +223,12 @@ pub fn Canvas(
         });
 
         // Draw the pixel canvas using its draw method
-        let canvas_state = pixel_canvas.get(); // This creates the reactive dependency
+        let canvas_state = canvas_state.get(); // This creates the reactive dependency
         canvas_state.draw(&context, mouse_pos);
     };
     Effect::new(move |_| {
         // Create reactive dependencies
-        let _canvas_state = pixel_canvas.get();
+        let _canvas_state = canvas_state.get();
         let _mouse_pos = mouse_position.get();
         let _drawing_state = drawing_state.get(); // Add drawing state as dependency
         

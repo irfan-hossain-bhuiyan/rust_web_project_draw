@@ -1,6 +1,9 @@
+use frontend::prelude::PixelColor;
 use web_sys::CanvasRenderingContext2d;
 
-use crate::prelude::{get_window_rect, get_window_size, Position, RectSize, Rectangle, Vec2, DrawingPixelCanvas};
+use crate::prelude::{
+    DrawingPixelCanvas, Position, RectSize, Rectangle, Vec2, get_window_rect, get_window_size,
+};
 
 // Constants for pixel canvas styling
 pub const PIXEL_SIZE: f64 = 30.0;
@@ -27,7 +30,9 @@ pub struct PixelCanvas {
     /// Zoom level (1.0 = normal, 2.0 = 2x zoom, etc.)
     zoom: f64,
     /// Drawing canvas for pixel data
+    main_canvas: DrawingPixelCanvas,
     drawing_canvas: DrawingPixelCanvas,
+    temp_canvas: DrawingPixelCanvas,
 }
 
 impl Default for PixelCanvas {
@@ -35,7 +40,9 @@ impl Default for PixelCanvas {
         Self {
             position: Position::new(-20.0, -20.0),
             zoom: 1.0,
+            main_canvas: DrawingPixelCanvas::new(GRID_SIZE, GRID_SIZE),
             drawing_canvas: DrawingPixelCanvas::new(GRID_SIZE, GRID_SIZE),
+            temp_canvas: DrawingPixelCanvas::new(GRID_SIZE, GRID_SIZE),
         }
     }
 }
@@ -46,23 +53,32 @@ impl PixelCanvas {
         Self {
             position: Position::new(x, y),
             zoom,
+            main_canvas: DrawingPixelCanvas::new(GRID_SIZE, GRID_SIZE),
             drawing_canvas: DrawingPixelCanvas::new(GRID_SIZE, GRID_SIZE),
+            temp_canvas: DrawingPixelCanvas::new(GRID_SIZE, GRID_SIZE),
         }
     }
 
     /// Get mutable reference to drawing canvas
-    pub fn drawing_canvas_mut(&mut self) -> &mut DrawingPixelCanvas {
-        &mut self.drawing_canvas
+    pub fn assign_pixel_bytes(&mut self, data: &[u8]) -> Result<(), String> {
+        self.main_canvas.assign_bytes(data)
     }
-
-    /// Get reference to drawing canvas
-    pub fn drawing_canvas(&self) -> &DrawingPixelCanvas {
-        &self.drawing_canvas
+    pub fn update_drawing(&mut self){
+        self.main_canvas.merge_top(&self.drawing_canvas);
+        self.drawing_canvas.clear();
     }
-
+    pub fn to_bytes(&self)->Vec<u8>{
+        self.main_canvas.to_bytes()
+    }
+    pub fn rendered_canvas(&self) -> DrawingPixelCanvas {
+        self.main_canvas
+            .layer_overlay(&self.drawing_canvas)
+            .layer_overlay(&self.temp_canvas)
+    }
     /// Implement lineDraw for PixelCanvas as requested
-    pub fn line_draw(&mut self, pos1:GridIndex,pos2:GridIndex, black: bool) {
-        self.drawing_canvas.draw_line(pos1.x, pos1.y, pos2.x, pos2.y, black);
+    pub fn line_draw(&mut self, pos1: GridIndex, pos2: GridIndex, color: PixelColor) {
+        self.drawing_canvas
+            .draw_line(pos1.x, pos1.y, pos2.x, pos2.y, color);
     }
     pub fn set_position(&mut self, x: f64, y: f64) {
         self.position = Position::new(x, y);
@@ -93,6 +109,7 @@ impl PixelCanvas {
         let scaled_pixel_size = PIXEL_SIZE * self.zoom;
         let scaled_gap = GAP * self.zoom;
         let scaled_border_radius = BORDER_RADIUS * self.zoom;
+        let rendered_canvas = self.rendered_canvas();
         // Set up stroke properties once
         context.set_stroke_style_str(PIXEL_STROKE_COLOR);
         context.set_line_width(PIXEL_LINE_WIDTH);
@@ -114,14 +131,12 @@ impl PixelCanvas {
                     .unwrap_or(false);
 
                 // Check if this pixel is black in the drawing canvas
-                let is_black_pixel = self.drawing_canvas.get_array().get(col, row).unwrap_or(false);
+                let pixel_color = rendered_canvas.get_pixel(col, row);
 
-                let fill_color = if is_black_pixel {
-                    "#000000" // Black pixel
-                } else if is_hovered {
+                let fill_color = if is_hovered {
                     PIXEL_HOVER_COLOR
                 } else {
-                    PIXEL_FILL_COLOR
+                    pixel_color.to_rgb()
                 };
                 context.set_fill_style_str(fill_color);
 

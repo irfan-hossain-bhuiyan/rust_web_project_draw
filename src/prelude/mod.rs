@@ -1,4 +1,5 @@
-use leptos::{logging::warn, server::codee::Encoder};
+use leptos::{logging::warn};
+use codee::{Decoder, Encoder};
 use web_sys::window;
 pub mod geometry;
 pub use geometry::*;
@@ -32,15 +33,17 @@ pub fn get_window_rect() -> Rectangle {
     Rectangle::from_pos_size(Position::zero(), get_window_size())
 }
 
-struct DummyCodec;
-impl Encoder<[u8]> for DummyCodec{
-    fn encode(val: &[u8]) -> Result<Self::Encoded, Self::Error> {
-        Ok()
-    }
+pub struct BytesPassthrough;
+impl codee::Encoder<Vec<u8>> for BytesPassthrough {
+    type Error = core::convert::Infallible;
+    type Encoded = Vec<u8>;
+    fn encode(val: &Vec<u8>) -> Result<Vec<u8>, Self::Error> { Ok(val.clone()) }
+}
 
-    type Error=;
-
-    type Encoded;
+impl codee::Decoder<Vec<u8>> for BytesPassthrough {
+    type Error = core::convert::Infallible;
+    type Encoded = [u8];
+    fn decode(val: &Self::Encoded) -> Result<Vec<u8>, Self::Error> { Ok(val.to_vec()) }
 }
 
 #[cfg(test)]
@@ -62,7 +65,7 @@ mod tests {
         assert!(!m.set(10,0, true));
 
         // clear
-        m.clear();
+        m.set_to_one();
         assert_eq!(m.count_ones(), 0);
 
         // row iteration
