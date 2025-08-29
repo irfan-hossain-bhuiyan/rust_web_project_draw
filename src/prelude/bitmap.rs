@@ -1,48 +1,9 @@
-use std::ops::{BitAndAssign, BitOrAssign, BitXorAssign, Index, Not};
+use std::ops::{BitAndAssign, BitOrAssign, BitXorAssign, Index, Not,BitOr};
 
 use bitvec::prelude::*;
 use leptos::logging::log;
 type RawBitVec = BitVec<u8, Lsb0>;
 type RawBitSlice = BitSlice<u8, Lsb0>;
-
-/// Computes per-bit f(a0, a1, r1) = 0 if (a1 = 0 and r1 = 1), else (a0 OR a1)
-///
-/// Boolean expression per bit:
-/// ```text
-/// f = ¬(¬a1 ∧ r1) ∧ (a0 ∨ a1)
-///    ≡ a1 ∨ (a0 ∧ ¬r1)
-/// ```
-/// Simplified: **f = a1 | (a0 & !r1)**
-///
-/// # Panics
-/// Panics if the input slices have different lengths.
-///
-/// # Examples
-/// ```
-/// use bitvec::prelude::*;
-/// let a0 = bitvec![0, 1, 0, 1];
-/// let a1 = bitvec![0, 0, 1, 1];
-/// let r1 = bitvec![1, 0, 1, 0];
-/// let out = custom_bits(&a0, &a1, &r1);
-/// assert_eq!(out, bitvec![0, 1, 1, 1]);
-/// ```
-fn alpha_bits(
-    a0: &BitSlice<u8, Lsb0>,
-    a1: &BitSlice<u8, Lsb0>,
-    r1: &BitSlice<u8, Lsb0>,
-) -> BitVec<u8, Lsb0> {
-    assert_eq!(a0.len(), a1.len());
-    assert_eq!(a0.len(), r1.len());
-
-    let mut out = a1.to_bitvec(); // start with a1
-    let mut tmp = a0.to_bitvec(); // copy a0
-
-    // invert r1 bits
-    tmp &= !r1.to_bitvec(); // tmp = a0 & !r1
-    out |= tmp; // out = a1 | (a0 & !r1)
-
-    out
-}
 
 /// Returns `a` if `c` is 0 (false), else selects `b`.
 ///
@@ -58,57 +19,20 @@ fn alpha_bits(
 /// let out = select_bits(&a, &b, &c);
 /// assert_eq!(out, bitvec![0, 1, 0, 1]);
 /// ```
-fn select_bits(
+pub fn select_bits(
     a: &BitSlice<u8, Lsb0>,
     b: &BitSlice<u8, Lsb0>,
     c: &BitSlice<u8, Lsb0>,
 ) -> BitVec<u8, Lsb0> {
     assert_eq!(a.len(), b.len());
     assert_eq!(a.len(), c.len());
-
-    let mut ans = a.to_bitvec();
-    ans ^= b.to_bitvec();
-    ans &= c.to_bitvec();
-    ans ^= a.to_bitvec();
-
-    ans
-}
-
-/// Returns `a` if `c` is 0, else returns `a & !b`.
-///
-/// # Panics
-/// - if lengths don’t match.
-///
-/// # Examples
-/// ```
-/// use bitvec::prelude::*;
-/// let a = bitvec![1, 1, 0, 1];
-/// let b = bitvec![0, 1, 1, 0];
-/// let c = bitvec![0, 1, 0, 1];
-/// let out = erase_bit(&a, &b, &c);
-/// assert_eq!(out, bitvec![1, 0, 0, 1]);
-/// ```
-fn erase_bit(
-    a: &BitSlice<u8, Lsb0>,
-    b: &BitSlice<u8, Lsb0>,
-    c: &BitSlice<u8, Lsb0>,
-) -> BitVec<u8, Lsb0> {
-    assert_eq!(a.len(), b.len());
-    assert_eq!(a.len(), c.len());
-
-    let mut result = a.to_bitvec();
-
-    // compute c & b in-place, store it in a temp BitVec
-    let mut cb = c.to_bitvec();
-    cb &= b.to_bitvec();
-
-    // invert cb: now contains !(c & b)
-    cb = !cb;
-
-    // apply mask: result &= cb
-    result &= cb;
-
-    result
+    // A ^ (C & (A ^ B))  -- fewer temporaries and correct
+    let mut out = a.to_bitvec();
+    let mut tmp = out.clone();       // tmp = A
+    tmp ^= b;                       // tmp = A ^ B
+    tmp &= c.to_bitvec();           // tmp = (A ^ B) & C
+    out ^= tmp;                     // out = A ^ tmp = A ^ ((A^B)&C) -> desired
+    out
 }
 // Note: depending on availability of `bitnot_assign()` on BitVec, you may need to invert per-bit by `!` mapping or manually.
 /// erase_bit ans=a if !c else a & ~b
@@ -281,6 +205,13 @@ pub struct PixelColor {
 impl PixelColor {
     pub const ALPHA: PixelColor = PixelColor::new(false, false, false, false);
     pub const BLACK: PixelColor = PixelColor::new(false, false, false, true);
+    pub const RED: PixelColor = PixelColor::new(true, false, false, true);
+    pub const GREEN: PixelColor = PixelColor::new(false, true, false, true);
+    pub const BLUE: PixelColor = PixelColor::new(false, false, true, true);
+    pub const YELLOW: PixelColor = PixelColor::new(true, true, false, true);
+    pub const MAGENTA: PixelColor = PixelColor::new(true, false, true, true);
+    pub const CYAN: PixelColor = PixelColor::new(false, true, true, true);
+    pub const WHITE: PixelColor = PixelColor::new(true, true, true, true);
     pub const ERASE: PixelColor = PixelColor::new(true, false, false, false);
     pub const fn new(r: bool, g: bool, b: bool, a: bool) -> Self {
         Self { r, g, b, a }
@@ -316,6 +247,43 @@ impl PixelColor {
             }
     }
 }
+
+pub struct DrawingPixelCanvasIter<'a> {
+    canvas: &'a DrawingPixelCanvas,
+    x: usize,
+    y: usize,
+}
+
+impl<'a> DrawingPixelCanvasIter<'a> {
+    fn new(canvas: &'a DrawingPixelCanvas) -> Self {
+        DrawingPixelCanvasIter { canvas, x: 0, y: 0 }
+    }
+}
+
+impl<'a> Iterator for DrawingPixelCanvasIter<'a> {
+    type Item = (usize, usize, PixelColor);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let (width, height) = self.canvas.dimension();
+
+        if self.y >= height {
+            return None;
+        }
+
+        let color = self.canvas.get_pixel(self.x, self.y);
+        let item = (self.x, self.y, color);
+
+        // advance position
+        self.x += 1;
+        if self.x >= width {
+            self.x = 0;
+            self.y += 1;
+        }
+
+        Some(item)
+    }
+}
+
 /// High-level drawing API for black/white pixel canvas
 #[derive(Clone, Debug)]
 pub struct DrawingPixelCanvas {
@@ -334,8 +302,21 @@ impl DrawingPixelCanvas {
             a_array: BitMatrix::new(width, height, false),
         }
     }
+    pub fn iter(&self) -> DrawingPixelCanvasIter<'_> {
+        DrawingPixelCanvasIter::new(self)
+    }
     pub fn dimension(&self) -> (usize, usize) {
         self.r_array.dimensions()
+    }
+    pub fn equals(&self, other: &Self) -> bool {
+        if self.dimension() != other.dimension() {
+            return false;
+        }
+
+        self.r_array.as_bytes() == other.r_array.as_bytes()
+            && self.g_array.as_bytes() == other.g_array.as_bytes()
+            && self.b_array.as_bytes() == other.b_array.as_bytes()
+            && self.a_array.as_bytes() == other.a_array.as_bytes()
     }
     /// Draw a single pixel (true = black, false = white).
     pub fn draw_pixel(&mut self, x: usize, y: usize, color: PixelColor) {
@@ -356,38 +337,34 @@ impl DrawingPixelCanvas {
         }
         None
     }
-    pub fn merge_top(&mut self, top_layer: &Self) {
-        assert!(self.dimension() == top_layer.dimension());
-        self.r_array
-            .assign_bits(select_bits(
-                self.r_array.as_bytes(),
-                top_layer.r_array.as_bytes(),
-                self.a_array.as_bytes(),
-            ))
-            .unwrap();
-        self.g_array
-            .assign_bits(select_bits(
-                self.g_array.as_bytes(),
-                top_layer.g_array.as_bytes(),
-                self.a_array.as_bytes(),
-            ))
-            .unwrap();
-        self.b_array
-            .assign_bits(select_bits(
-                self.b_array.as_bytes(),
-                top_layer.b_array.as_bytes(),
-                self.a_array.as_bytes(),
-            ))
-            .unwrap();
-        // TODO: Can be optimized later maybe.
-        self.a_array
-            .assign_bits(alpha_bits(
-                self.a_array.as_bytes(),
-                top_layer.a_array.as_bytes(),
-                top_layer.r_array.as_bytes(),
-            ))
-            .unwrap();
+    pub fn search_color(&self, color: PixelColor) -> Option<(usize, usize)> {
+        for (x, y, c) in self.iter() {
+            if c == color {
+                return Some((x, y));
+            }
+        }
+        None
     }
+    pub fn merge_top(&mut self, top_layer: &Self) {
+        assert_eq!(self.dimension(), top_layer.dimension());
+
+        let (w, h) = self.dimension();
+        for y in 0..h {
+            for x in 0..w {
+                let top = top_layer.get_pixel(x, y);
+
+                if top == PixelColor::ERASE {
+                    // special erase: clear this pixel
+                    self.draw_pixel(x, y, PixelColor::ALPHA);
+                } else if top.a {
+                    // normal blending: replace bottom with top
+                    self.draw_pixel(x, y, top);
+                }
+                // else: leave bottom unchanged
+            }
+        }
+    }
+    
     pub fn layer_overlay(&self, top_layer: &Self) -> DrawingPixelCanvas {
         let mut main = self.clone();
         main.merge_top(top_layer);
@@ -413,7 +390,7 @@ impl DrawingPixelCanvas {
     /// Draw a line using Bresenham's algorithm.
     pub fn draw_line(&mut self, x0: usize, y0: usize, x1: usize, y1: usize, color: PixelColor) {
         if (x0, y0) == (x1, y1) {
-            self.draw_pixel(x0 , y0 , color);
+            self.draw_pixel(x0, y0, color);
             return;
         }
 
@@ -450,7 +427,7 @@ impl DrawingPixelCanvas {
         }
     }
 
-    /// Clear canvas (white background)
+    /// Clear canvas (alpha background)
     pub fn clear(&mut self) {
         self.r_array.clear();
         self.g_array.clear();

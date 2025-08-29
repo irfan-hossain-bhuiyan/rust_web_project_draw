@@ -2,7 +2,7 @@ use frontend::prelude::PixelColor;
 use leptos::logging::log;
 use web_sys::CanvasRenderingContext2d;
 
-use crate::{components::canvas::PEN_TOUCHED, prelude::{
+use crate::{components::canvas::{GREEN_TOUCHED, PEN_TOUCHED}, prelude::{
     get_window_rect, get_window_size, DrawingPixelCanvas, Position, RectSize, Rectangle
 }};
 
@@ -75,9 +75,9 @@ impl PixelCanvas {
         self.drawing_canvas.is_transpernet_debug()
     }
     pub fn rendered_canvas(&self) -> DrawingPixelCanvas {
-        self.main_canvas
-            .layer_overlay(&self.drawing_canvas)
-            .layer_overlay(&self.temp_canvas)
+        let mut rendered_canvas=self.main_canvas.clone();
+        rendered_canvas.merge_top(&self.drawing_canvas);
+        rendered_canvas
     }
     /// Implement lineDraw for PixelCanvas as requested
     pub fn line_draw(&mut self, pos1: GridIndex, pos2: GridIndex, color: PixelColor) {
@@ -118,9 +118,12 @@ impl PixelCanvas {
         let scaled_pixel_size = PIXEL_SIZE * self.zoom;
         let scaled_gap = GAP * self.zoom;
         let scaled_border_radius = BORDER_RADIUS * self.zoom;
-        let rendered_canvas = self.rendered_canvas();
+        let rendered_canvas = self.rendered_canvas();//self.rendered_canvas();
         if unsafe { PEN_TOUCHED }{
             assert!(!rendered_canvas.is_transpernet_debug());
+        }
+        if unsafe {GREEN_TOUCHED}{
+            assert!(rendered_canvas.search_color(PixelColor::GREEN).is_some())
         }
         // Set up stroke properties once
         context.set_stroke_style_str(PIXEL_STROKE_COLOR);

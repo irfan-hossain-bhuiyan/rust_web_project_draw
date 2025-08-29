@@ -122,6 +122,61 @@ body {
     letter-spacing: 0.5px;
 }
 
+
+.color-picker {
+    background: rgba(0, 0, 0, 0.9);
+    border-radius: 8px;
+    padding: 10px;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px);
+    transition: all 0.2s ease;
+    z-index: 2000;
+}
+
+.color-picker.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+.color-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    min-width: 120px;
+}
+
+.color-button {
+    width: 24px;
+    height: 24px;
+    border: 2px solid #333;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.color-button:hover {
+    border-color: #fff;
+    transform: scale(1.1);
+}
+
+/* Ensure toolbar container has relative positioning */
+.toolbar {
+    position: relative;
+}
+
+/* Optional: Add a small arrow pointing down from color picker */
+.color-picker::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 20px;
+    width: 0;
+    height: 0;
+    border: 6px solid transparent;
+    border-top-color: rgba(0, 0, 0, 0.9);
+}
+
 /* Responsive design */
 @media (max-width: 768px) {
     .toolbar {
