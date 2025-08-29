@@ -115,6 +115,12 @@ impl RectSize {
     pub unsafe fn new_unchecked(width: f64, height: f64) -> Self {
         Self { width, height }
     }
+    pub fn new_checked(width: f64,height: f64)->Result<Self,String>{
+        if (width>=0.0) & (height>=0.0){
+            return Ok(Self { width, height });
+        }
+        Err("rectsize width and height is negative".into())
+    }
     pub fn new(width: f64, height: f64) -> Self {
         let width = width.max(0.0);
         let height = height.max(0.0);
@@ -174,16 +180,24 @@ impl Rectangle {
             dr: Position::new(drx, dry),
         }
     }
-    //For this function you need to make sure dr is larger than ul
+
+    /// # Safety
+    //  For this function you need to make sure dr is larger than ul
     pub unsafe fn from_ul_dr_unchecked(ul: Position, dr: Position) -> Self {
         Self { ul, dr }
+    }
+    pub fn from_ul_dr(ul: Position, dr: Position) -> Result<Self, String> {
+        if (ul.x()<=dr.x()) & (ul.y() <= dr.y()){
+            return Ok(Self{ ul, dr });
+        }
+        Err(format!("rectangle construction argument is invalid.minpos:{ul:?},max_pos:{dr:?}"))
     }
 
     /// Create rectangle from upper-left position and size
     pub fn from_pos_size(ul: Position, size: RectSize) -> Self {
         let br = Position::new(ul.x() + size.width, ul.y() + size.height);
         // Reuse normalization logic
-        unsafe { Self::from_ul_dr_unchecked(ul, br) }
+        Self::from_ul_dr(ul, br).unwrap()
     }
 
     /// Upper-left corner
@@ -230,14 +244,15 @@ impl Rectangle {
         let dr = Position::new(c.x() + half_w, c.y() + half_h);
 
         //scaling valid rectangle is still valid
-        *self = unsafe { Rectangle::from_ul_dr_unchecked(ul, dr) };
+        //TODO:remove unwrap
+        *self = Rectangle::from_ul_dr(ul, dr).unwrap();
     }
 
     /// Expand this rectangle to include `other` (mutates to the bounding union).
     pub fn expand_to_include(&mut self, other: Rectangle) {
         let ul = Position::new(self.ul.x().min(other.ul.x()), self.ul.y().min(other.ul.y()));
         let dr = Position::new(self.dr.x().max(other.dr.x()), self.dr.y().max(other.dr.y()));
-        *self = unsafe { Rectangle::from_ul_dr_unchecked(ul, dr) };
+        *self = Rectangle::from_ul_dr(ul, dr).unwrap() ;
     }
 
     /// Size of the rectangle

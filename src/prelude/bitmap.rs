@@ -150,12 +150,15 @@ impl BitMatrix {
         self.idx(x, y).map(|i| self.data[i])
     }
 
-    pub fn set(&mut self, x: usize, y: usize, value: bool)->Result<(),String> {
+    pub fn set(&mut self, x: usize, y: usize, value: bool) -> Result<(), String> {
         if let Some(i) = self.idx(x, y) {
             self.data.set(i, value);
             Ok(())
         } else {
-            Err(format!("Out of boundary {x} x {y} index for size {} x {}",self.width,self.height))
+            Err(format!(
+                "Out of boundary {x} x {y} index for size {} x {}",
+                self.width, self.height
+            ))
         }
     }
     pub fn as_bytes(&self) -> &BitSlice<u8> {
@@ -220,6 +223,53 @@ impl Index<(usize, usize)> for BitMatrix {
         &self.data[self.idx(x, y).unwrap()]
     }
 }
+
+pub struct BitMatrixIter<'a> {
+    matrix: &'a BitMatrix,
+    index: usize,
+}
+
+impl<'a> Iterator for BitMatrixIter<'a> {
+    type Item = (usize, usize, bool);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index >= self.matrix.data.len() {
+            return None;
+        }
+
+        let idx = self.index;
+        let x = idx % self.matrix.width;
+        let y = idx / self.matrix.width;
+        let value = self.matrix.data[idx];
+
+        self.index += 1;
+
+        Some((x, y, value))
+    }
+}
+
+impl BitMatrix {
+    pub fn iter(&self) -> BitMatrixIter<'_> {
+        BitMatrixIter {
+            matrix: self,
+            index: 0,
+        }
+    }
+}
+
+/// Allow `for (x, y, val) in &matrix`
+impl<'a> IntoIterator for &'a BitMatrix {
+    type Item = (usize, usize, bool);
+    type IntoIter = BitMatrixIter<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        BitMatrixIter {
+            matrix: self,
+            index: 0,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Copy, PartialEq, Eq)]
 pub struct PixelColor {
     r: bool,
@@ -239,7 +289,7 @@ impl PixelColor {
         Self { r, g, b, a: false }
     }
     pub fn to_rgb(&self) -> &'static str {
-        if !self.a {
+        if self.is_transperent() {
             return "#dddddd";
         }
         match (self.r, self.g, self.b) {
@@ -293,7 +343,18 @@ impl DrawingPixelCanvas {
         self.g_array.set(x, y, color.g).unwrap();
         self.b_array.set(x, y, color.b).unwrap();
         self.a_array.set(x, y, color.a).unwrap();
-        log!("color: {:?}",color)
+        assert_eq!(self.a_array.get(x, y), Some(color.a))
+    }
+    pub fn is_transpernet_debug(&self) -> bool {
+        !self.a_array.as_bytes().any()
+    }
+    pub fn non_transperent_value(&self) -> std::option::Option<(usize, usize)> {
+        for (x, y, b) in self.a_array.iter() {
+            if b {
+                return Some((x, y));
+            }
+        }
+        None
     }
     pub fn merge_top(&mut self, top_layer: &Self) {
         assert!(self.dimension() == top_layer.dimension());
@@ -339,11 +400,23 @@ impl DrawingPixelCanvas {
         let r = self.r_array.get(x, y).unwrap_or(false);
         let g = self.g_array.get(x, y).unwrap_or(false);
         let b = self.b_array.get(x, y).unwrap_or(false);
-        let a = self.b_array.get(x, y).unwrap_or(false);
+        let a = self.a_array.get(x, y).unwrap_or(false);
         PixelColor { r, g, b, a }
+    }
+    pub fn get_pixel_checked(&self, x: usize, y: usize) -> Option<PixelColor> {
+        let r = self.r_array.get(x, y)?;
+        let g = self.g_array.get(x, y)?;
+        let b = self.b_array.get(x, y)?;
+        let a = self.a_array.get(x, y)?;
+        Some(PixelColor { r, g, b, a })
     }
     /// Draw a line using Bresenham's algorithm.
     pub fn draw_line(&mut self, x0: usize, y0: usize, x1: usize, y1: usize, color: PixelColor) {
+        if (x0, y0) == (x1, y1) {
+            self.draw_pixel(x0 , y0 , color);
+            return;
+        }
+
         let (mut x0, mut y0, x1, y1) = (x0 as isize, y0 as isize, x1 as isize, y1 as isize);
 
         let dx = (x1 - x0).abs();
@@ -355,6 +428,10 @@ impl DrawingPixelCanvas {
         loop {
             if x0 >= 0 && y0 >= 0 {
                 self.draw_pixel(x0 as usize, y0 as usize, color);
+                assert_eq!(
+                    self.get_pixel_checked(x0 as usize, y0 as usize),
+                    Some(color)
+                );
             }
 
             if x0 == x1 && y0 == y1 {

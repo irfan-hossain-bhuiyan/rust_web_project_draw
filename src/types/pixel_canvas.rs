@@ -2,15 +2,15 @@ use frontend::prelude::PixelColor;
 use leptos::logging::log;
 use web_sys::CanvasRenderingContext2d;
 
-use crate::prelude::{
-    DrawingPixelCanvas, Position, RectSize, Rectangle, Vec2, get_window_rect, get_window_size,
-};
+use crate::{components::canvas::PEN_TOUCHED, prelude::{
+    get_window_rect, get_window_size, DrawingPixelCanvas, Position, RectSize, Rectangle
+}};
 
 // Constants for pixel canvas styling
 pub const PIXEL_SIZE: f64 = 30.0;
 pub const GAP: f64 = 4.0;
 pub const BORDER_RADIUS: f64 = 5.0;
-pub const GRID_SIZE: usize = 10;
+pub const GRID_SIZE: usize = 100;
 pub const PIXEL_FILL_COLOR: &str = "#dddddd";
 pub const PIXEL_HOVER_COLOR: &str = "#bbbbbb";
 pub const PIXEL_STROKE_COLOR: &str = "#111111";
@@ -40,7 +40,7 @@ impl Default for PixelCanvas {
     fn default() -> Self {
         Self {
             position: Position::new(-20.0, -20.0),
-            zoom: 1.0,
+            zoom: 2.0,
             main_canvas: DrawingPixelCanvas::new(GRID_SIZE, GRID_SIZE),
             drawing_canvas: DrawingPixelCanvas::new(GRID_SIZE, GRID_SIZE),
             temp_canvas: DrawingPixelCanvas::new(GRID_SIZE, GRID_SIZE),
@@ -61,15 +61,18 @@ impl PixelCanvas {
     }
 
     /// Get mutable reference to drawing canvas
-    pub fn assign_pixel_bytes<'a>(&mut self, data: &'a[u8]) -> Result<&'a[u8], String> {
+    pub fn assign_pixel_bytes<'a>(&mut self, data: &'a [u8]) -> Result<&'a [u8], String> {
         self.main_canvas.assign_bytes(data)
     }
-    pub fn update_drawing(&mut self){
+    pub fn update_drawing(&mut self) {
         self.main_canvas.merge_top(&self.drawing_canvas);
         self.drawing_canvas.clear();
     }
-    pub fn to_bytes(&self)->Vec<u8>{
+    pub fn to_bytes(&self) -> Vec<u8> {
         self.main_canvas.to_bytes()
+    }
+    pub fn is_drawing_transperent(&self) -> bool {
+        self.drawing_canvas.is_transpernet_debug()
     }
     pub fn rendered_canvas(&self) -> DrawingPixelCanvas {
         self.main_canvas
@@ -80,8 +83,11 @@ impl PixelCanvas {
     pub fn line_draw(&mut self, pos1: GridIndex, pos2: GridIndex, color: PixelColor) {
         self.drawing_canvas
             .draw_line(pos1.x, pos1.y, pos2.x, pos2.y, color);
-
-        //log!("{}",self.drawing_canvas.to_ascii());
+    }
+    pub fn pixel_draw(&mut self, pos: GridIndex, color: PixelColor) {
+        self.drawing_canvas
+            .draw_pixel(pos.x,pos.y, color);
+        log!("pixel color after drawing: {:?} in index {pos:?}", self.drawing_canvas.get_pixel(pos.x, pos.y));
     }
     pub fn set_position(&mut self, x: f64, y: f64) {
         self.position = Position::new(x, y);
@@ -101,7 +107,7 @@ impl PixelCanvas {
         let min_pos = min_pos.pos_clamp(max_pos, false, false);
         self.position = self
             .position
-            .rect_clamp(unsafe { Rectangle::from_ul_dr_unchecked(min_pos, max_pos) });
+            .rect_clamp(Rectangle::from_ul_dr(min_pos, max_pos).unwrap());
     }
     pub fn get_rect(&self) -> Rectangle {
         Rectangle::from_pos_size(self.position, self.get_size())
@@ -112,14 +118,16 @@ impl PixelCanvas {
         let scaled_pixel_size = PIXEL_SIZE * self.zoom;
         let scaled_gap = GAP * self.zoom;
         let scaled_border_radius = BORDER_RADIUS * self.zoom;
-        let rendered_canvas = self.drawing_canvas.clone();
+        let rendered_canvas = self.rendered_canvas();
+        if unsafe { PEN_TOUCHED }{
+            assert!(!rendered_canvas.is_transpernet_debug());
+        }
         // Set up stroke properties once
         context.set_stroke_style_str(PIXEL_STROKE_COLOR);
         context.set_line_width(PIXEL_LINE_WIDTH);
 
         // Calculate hovered pixel if mouse position is provided
         let hovered_grid = mouse_pos.map(|pos| self.closest_grid_index_from_point(pos));
-
         let (index_ul, index_dr) = self.viewed_row_coloumed();
         // Draw grid
         for row in index_ul.y..index_dr.y {
@@ -134,8 +142,8 @@ impl PixelCanvas {
                     .unwrap_or(false);
 
                 // Check if this pixel is black in the drawing canvas
+                
                 let pixel_color = rendered_canvas.get_pixel(col, row);
-
                 let fill_color = if is_hovered {
                     PIXEL_HOVER_COLOR
                 } else {
@@ -179,7 +187,7 @@ impl PixelCanvas {
     /// Set position
     fn zoom_clamp(&mut self) {
         const ZOOM_MAX: f64 = 2.0;
-        const ZOOM_MIN: f64 = 0.6;
+        const ZOOM_MIN: f64 = 0.7;
         self.zoom = self.zoom.clamp(ZOOM_MIN, ZOOM_MAX);
     }
     /// Set zoom level
@@ -220,7 +228,7 @@ impl PixelCanvas {
         let width = (GRID_SIZE as f64) * (PIXEL_SIZE + GAP);
         let height = (GRID_SIZE as f64) * (PIXEL_SIZE + GAP);
 
-        unsafe { RectSize::new_unchecked(width, height) }
+        RectSize::new_checked(width, height).unwrap()
     }
     fn viewed_row_coloumed(&self) -> (GridIndex, GridIndex) {
         let win_rect = get_window_rect();
@@ -244,3 +252,4 @@ impl PixelCanvas {
         }
     }
 }
+

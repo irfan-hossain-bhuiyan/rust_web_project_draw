@@ -9,6 +9,7 @@ use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
 use crate::types::pixel_canvas::{PixelCanvas, CANVAS_BACKGROUND_COLOR, GridIndex};
 use crate::components::DrawingTool;
 
+pub static mut PEN_TOUCHED:bool=false;
 /// Get Canvas2D rendering context from canvas element
 fn get_canvas_2d_context(canvas: &HtmlCanvasElement) -> Result<CanvasRenderingContext2d, String> {
     canvas
@@ -145,13 +146,18 @@ pub fn Canvas(
                 match current_tool {
                     DrawingTool::Pen => {
                         // Draw line from last position to current position
+                        log!("pixel drawing.");
+                        //pc.pixel_draw(current_pos,PixelColor::BLACK);
                         pc.line_draw(last_position, current_pos,PixelColor::BLACK);
-                        log!("Line drawing");
+                        unsafe {PEN_TOUCHED=true;}
+                        assert!(!pc.is_drawing_transperent());
+    
                     }
                     DrawingTool::Eraser => {
                         // Erase line from last position to current position
-                        pc.line_draw(last_position, current_pos,PixelColor::ERASE);
                         log!("Line erasing");
+                        unsafe {PEN_TOUCHED=false;}
+                        pc.line_draw(last_position, current_pos,PixelColor::ERASE);
                     }
                 }
             });

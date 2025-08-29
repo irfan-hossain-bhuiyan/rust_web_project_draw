@@ -1,3 +1,7 @@
+## Debug:
+- line draw is not working,after updating line draw the entire canvas is empty.
+- 
+
 ## done:
 - refactor get window dimension,that is a basic function
 - implementing vec rect,pos object to make operation easier,
@@ -21,7 +25,6 @@ Or make a function that will return delta x and delta y,that logic can be moved 
 - having a over pop menu that will give list of tools to use
 - having smooth scrolling
 - As for simplicity use axum and every time it loads entire bitset from the server and render it
-    Input from the browser will pass as lineDraw,
 - also code for boundary,canvas not to draw edge of the canvas
     - make position bounded.let not it br any positive value.
 - color the background somewhat gradient.
