@@ -3,8 +3,9 @@ use leptos::ev;
 use leptos::prelude::*;
 use leptos::html;
 
-#[derive(Clone, Debug, PartialEq)]
 
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum DrawingTool {
     Pen(PixelColor),
     Eraser,
