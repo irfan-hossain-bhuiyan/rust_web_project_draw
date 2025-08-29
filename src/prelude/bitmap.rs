@@ -1,6 +1,7 @@
 use std::ops::{BitAndAssign, BitOrAssign, BitXorAssign, Index, Not};
 
 use bitvec::prelude::*;
+use leptos::logging::log;
 type RawBitVec = BitVec<u8, Lsb0>;
 type RawBitSlice = BitSlice<u8, Lsb0>;
 
@@ -141,7 +142,7 @@ impl BitMatrix {
             None
         }
     }
-    fn idx_unchecked(&self, x: usize, y: usize) -> usize {
+    unsafe fn idx_unchecked(&self, x: usize, y: usize) -> usize {
         y * self.width + x
     }
 
@@ -149,12 +150,12 @@ impl BitMatrix {
         self.idx(x, y).map(|i| self.data[i])
     }
 
-    pub fn set(&mut self, x: usize, y: usize, value: bool) -> bool {
+    pub fn set(&mut self, x: usize, y: usize, value: bool)->Result<(),String> {
         if let Some(i) = self.idx(x, y) {
             self.data.set(i, value);
-            true
+            Ok(())
         } else {
-            false
+            Err(format!("Out of boundary {x} x {y} index for size {} x {}",self.width,self.height))
         }
     }
     pub fn as_bytes(&self) -> &BitSlice<u8> {
@@ -216,7 +217,7 @@ impl Index<(usize, usize)> for BitMatrix {
     type Output = bool;
     fn index(&self, index: (usize, usize)) -> &Self::Output {
         let (x, y) = index;
-        &self.data[self.idx_unchecked(x, y)]
+        &self.data[self.idx(x, y).unwrap()]
     }
 }
 #[derive(Clone, Debug, Copy, PartialEq, Eq)]
@@ -288,10 +289,11 @@ impl DrawingPixelCanvas {
     }
     /// Draw a single pixel (true = black, false = white).
     pub fn draw_pixel(&mut self, x: usize, y: usize, color: PixelColor) {
-        self.r_array.set(x, y, color.r);
-        self.g_array.set(x, y, color.g);
-        self.b_array.set(x, y, color.b);
-        self.a_array.set(x, y, color.a);
+        self.r_array.set(x, y, color.r).unwrap();
+        self.g_array.set(x, y, color.g).unwrap();
+        self.b_array.set(x, y, color.b).unwrap();
+        self.a_array.set(x, y, color.a).unwrap();
+        log!("color: {:?}",color)
     }
     pub fn merge_top(&mut self, top_layer: &Self) {
         assert!(self.dimension() == top_layer.dimension());
@@ -386,9 +388,9 @@ impl DrawingPixelCanvas {
         for y in 0..h {
             for x in 0..w {
                 out.push(if self.get_pixel(x, y).is_transperent() {
-                    '█'
-                } else {
                     ' '
+                } else {
+                    '8'
                 });
             }
             out.push('\n');

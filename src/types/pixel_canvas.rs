@@ -81,7 +81,7 @@ impl PixelCanvas {
         self.drawing_canvas
             .draw_line(pos1.x, pos1.y, pos2.x, pos2.y, color);
 
-        log!("{}",self.drawing_canvas.to_ascii());
+        //log!("{}",self.drawing_canvas.to_ascii());
     }
     pub fn set_position(&mut self, x: f64, y: f64) {
         self.position = Position::new(x, y);

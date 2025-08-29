@@ -5,7 +5,6 @@ use frontend::prelude::BytesPassthrough;
 use leptos::{logging::{error, log}, prelude::*};
 use leptos_use::{self, UseWebSocketReturn, use_websocket};
 mod components;
-mod services;
 mod types;
 use components::{Canvas, DrawingTool};
 pub use frontend::prelude;
