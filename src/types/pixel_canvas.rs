@@ -1,10 +1,15 @@
-use frontend::prelude::PixelColor;
+use std::collections::VecDeque;
+
+use frontend::prelude::{BitMatrix, PixelColor};
 use leptos::logging::log;
 use web_sys::CanvasRenderingContext2d;
 
-use crate::{components::canvas::{GREEN_TOUCHED, PEN_TOUCHED}, prelude::{
-    get_window_rect, get_window_size, DrawingPixelCanvas, Position, RectSize, Rectangle
-}};
+use crate::{
+    components::canvas::{GREEN_TOUCHED, PEN_TOUCHED},
+    prelude::{
+        DrawingPixelCanvas, Position, RectSize, Rectangle, get_window_rect, get_window_size,
+    },
+};
 
 // Constants for pixel canvas styling
 pub const PIXEL_SIZE: f64 = 30.0;
@@ -74,8 +79,11 @@ impl PixelCanvas {
     pub fn is_drawing_transperent(&self) -> bool {
         self.drawing_canvas.is_transpernet_debug()
     }
+    pub fn grid_dimension(&self) -> (usize, usize) {
+        self.main_canvas.dimension()
+    }
     pub fn rendered_canvas(&self) -> DrawingPixelCanvas {
-        let mut rendered_canvas=self.main_canvas.clone();
+        let mut rendered_canvas = self.main_canvas.clone();
         rendered_canvas.merge_top(&self.drawing_canvas);
         rendered_canvas
     }
@@ -84,10 +92,16 @@ impl PixelCanvas {
         self.drawing_canvas
             .draw_line(pos1.x, pos1.y, pos2.x, pos2.y, color);
     }
+    
     pub fn pixel_draw(&mut self, pos: GridIndex, color: PixelColor) {
-        self.drawing_canvas
-            .draw_pixel(pos.x,pos.y, color);
-        log!("pixel color after drawing: {:?} in index {pos:?}", self.drawing_canvas.get_pixel(pos.x, pos.y));
+        self.drawing_canvas.draw_pixel(pos.x, pos.y, color);
+        log!(
+            "pixel color after drawing: {:?} in index {pos:?}",
+            self.drawing_canvas.get_pixel(pos.x, pos.y)
+        );
+    }
+    pub fn bucket_draw(&mut self,pos:GridIndex,color:PixelColor){
+        self.drawing_canvas.bucket_fill(pos.x,pos.y,color,&self.rendered_canvas());
     }
     pub fn set_position(&mut self, x: f64, y: f64) {
         self.position = Position::new(x, y);
@@ -118,11 +132,11 @@ impl PixelCanvas {
         let scaled_pixel_size = PIXEL_SIZE * self.zoom;
         let scaled_gap = GAP * self.zoom;
         let scaled_border_radius = BORDER_RADIUS * self.zoom;
-        let rendered_canvas = self.rendered_canvas();//self.rendered_canvas();
-        if unsafe { PEN_TOUCHED }{
+        let rendered_canvas = self.rendered_canvas(); //self.rendered_canvas();
+        if unsafe { PEN_TOUCHED } {
             assert!(!rendered_canvas.is_transpernet_debug());
         }
-        if unsafe {GREEN_TOUCHED}{
+        if unsafe { GREEN_TOUCHED } {
             assert!(rendered_canvas.search_color(PixelColor::GREEN).is_some())
         }
         // Set up stroke properties once
@@ -145,7 +159,7 @@ impl PixelCanvas {
                     .unwrap_or(false);
 
                 // Check if this pixel is black in the drawing canvas
-                
+
                 let pixel_color = rendered_canvas.get_pixel(col, row);
                 let fill_color = if is_hovered {
                     PIXEL_HOVER_COLOR
@@ -255,4 +269,3 @@ impl PixelCanvas {
         }
     }
 }
-

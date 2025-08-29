@@ -1,4 +1,4 @@
-use std::ops::{BitAndAssign, BitOrAssign, BitXorAssign, Index, Not,BitOr};
+use std::{collections::VecDeque, ops::{BitAndAssign, BitOr, BitOrAssign, BitXorAssign, Index, Not}};
 
 use bitvec::prelude::*;
 use leptos::logging::log;
@@ -196,10 +196,10 @@ impl<'a> IntoIterator for &'a BitMatrix {
 
 #[derive(Clone, Debug, Copy, PartialEq, Eq)]
 pub struct PixelColor {
-    r: bool,
-    g: bool,
-    b: bool,
-    a: bool,
+    pub r: bool,
+    pub g: bool,
+    pub b: bool,
+    pub a: bool,
 }
 
 impl PixelColor {
@@ -328,6 +328,53 @@ impl DrawingPixelCanvas {
     }
     pub fn is_transpernet_debug(&self) -> bool {
         !self.a_array.as_bytes().any()
+    }
+    pub fn bucket_fill(
+        &mut self,
+        start_x: usize,
+        start_y: usize,
+        color: PixelColor,
+        boundary_canvas: &DrawingPixelCanvas,
+    ) {
+        let (w, h) = self.dimension();
+
+        // if starting point is outside canvas -> nothing
+        if start_x >= w || start_y >= h {
+            return;
+        }
+
+        // Do not fill if start is on a boundary
+        if boundary_canvas.get_pixel(start_x, start_y).a {
+            return;
+        }
+
+        let mut visited = BitMatrix::new(w, h, false);
+        let mut queue = VecDeque::new();
+        queue.push_back((start_x, start_y));
+        visited.set(start_x, start_y, true).unwrap();
+
+        while let Some((x, y)) = queue.pop_front() {
+            // Fill this pixel
+            self.draw_pixel(x, y, color);
+
+            // Explore 4-neighbors
+            let neighbors = [
+                (x.wrapping_sub(1), y),
+                (x + 1, y),
+                (x, y.wrapping_sub(1)),
+                (x, y + 1),
+            ];
+
+            for (nx, ny) in neighbors {
+                if nx < w && ny < h {
+                    // Only spread if not visited AND not boundary
+                    if !visited.get(nx, ny).unwrap() && !boundary_canvas.get_pixel(nx, ny).a {
+                        visited.set(nx, ny, true).unwrap();
+                        queue.push_back((nx, ny));
+                    }
+                }
+            }
+        }
     }
     pub fn non_transperent_value(&self) -> std::option::Option<(usize, usize)> {
         for (x, y, b) in self.a_array.iter() {

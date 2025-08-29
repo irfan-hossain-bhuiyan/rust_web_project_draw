@@ -1,14 +1,15 @@
 use frontend::prelude::PixelColor;
 use leptos::ev;
+use leptos::html;
 use leptos::logging::log;
 use leptos::prelude::*;
-use leptos::html;
 use web_sys::MouseEvent;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum DrawingTool {
     Pen(PixelColor),
     Eraser,
+    BucketFill(PixelColor),
 }
 
 impl Default for DrawingTool {
@@ -22,13 +23,22 @@ impl DrawingTool {
         match self {
             DrawingTool::Pen(_) => "✏️",
             DrawingTool::Eraser => "🧽",
+            DrawingTool::BucketFill(_) => "🪣",
         }
     }
-    
+
     pub fn name(&self) -> &'static str {
         match self {
             DrawingTool::Pen(_) => "Pen",
             DrawingTool::Eraser => "Eraser",
+            DrawingTool::BucketFill(_) => "Bucket Fill",
+        }
+    }
+    pub fn change_color(&mut self,color:PixelColor){
+        *self=match *self {
+            DrawingTool::Eraser => DrawingTool::Eraser,
+            DrawingTool::Pen(_) => DrawingTool::Pen(color),
+            DrawingTool::BucketFill(_) => DrawingTool::BucketFill(color)
         }
     }
 }
@@ -47,7 +57,7 @@ const COLORS: [(&str, PixelColor); 8] = [
 #[component]
 pub fn Toolbar(#[prop(into)] selected_tool: RwSignal<DrawingTool>) -> impl IntoView {
     let show_color_picker = RwSignal::new(false);
-    
+
     view! {
         <div class="toolbar">
             <div class="toolbar-title">Drawing Tools</div>
@@ -66,15 +76,36 @@ pub fn Toolbar(#[prop(into)] selected_tool: RwSignal<DrawingTool>) -> impl IntoV
                     }
                     on:contextmenu=move |ev: MouseEvent| {
                         ev.prevent_default();
-                        log!("right click pressed.");
                         show_color_picker.set(!show_color_picker.get());
                     }
                 >
                     <span class="tool-icon">"✏️"</span>
                     <span class="tool-name">"Pen"</span>
                 </button>
-                
-                // Eraser button  
+
+                // Bucket Fill button
+                <button
+                    class=move || {
+                        if matches!(selected_tool.get(), DrawingTool::BucketFill(_)) {
+                            "tool-button active"
+                        } else {
+                            "tool-button"
+                        }
+                    }
+                    on:click=move |_| {
+                        selected_tool.set(DrawingTool::BucketFill(PixelColor::BLACK));
+                    }
+                    on:contextmenu=move |ev: MouseEvent| {
+                        ev.prevent_default();
+                        log!("right click pressed on bucket fill.");
+                        show_color_picker.set(!show_color_picker.get());
+                    }
+                >
+                    <span class="tool-icon">"🪣"</span>
+                    <span class="tool-name">"Fill"</span>
+                </button>
+
+                // Eraser button
                 <button
                     class=move || {
                         if matches!(selected_tool.get(), DrawingTool::Eraser) {
@@ -91,10 +122,11 @@ pub fn Toolbar(#[prop(into)] selected_tool: RwSignal<DrawingTool>) -> impl IntoV
                     <span class="tool-name">"Eraser"</span>
                 </button>
             </div>
-            
-            // Color picker
-            <div 
+
+            // Color picker (positioned below toolbar)
+            <div
                 class=move || if show_color_picker.get() { "color-picker show" } else { "color-picker" }
+                style="position: absolute; top: 100%; left: 0; margin-top: 5px;"
             >
                 <div class="color-grid">
                     {COLORS.iter().map(|(hex, pixel_color)| {
@@ -103,10 +135,9 @@ pub fn Toolbar(#[prop(into)] selected_tool: RwSignal<DrawingTool>) -> impl IntoV
                         view! {
                             <button
                                 class="color-button"
-                                style=move || format!("background-color: {hex_str}")
+                                style=move || format!("background-color: {}", hex_str)
                                 on:click=move |_| {
-                                    selected_tool.set(DrawingTool::Pen(color));
-                                    log!("color picked {color:?}");
+                                    selected_tool.update(|x|x.change_color(color));
                                     show_color_picker.set(false);
                                 }
                             />
@@ -121,17 +152,16 @@ pub fn Toolbar(#[prop(into)] selected_tool: RwSignal<DrawingTool>) -> impl IntoV
 #[component]
 pub fn ToolbarWithTrigger(#[prop(into)] selected_tool: RwSignal<DrawingTool>) -> impl IntoView {
     let show_toolbar = RwSignal::new(false);
-    
+
     window_event_listener(ev::mousemove, move |ev: MouseEvent| {
         let y = ev.client_y();
         if y < 20 {
             show_toolbar.set(true);
         } else if !show_toolbar.get() {
-                show_toolbar.set(false);
-            
+            show_toolbar.set(false);
         }
     });
-    
+
     view! {
         <div
             class=move || if show_toolbar.get() { "toolbar-container show" } else { "toolbar-container" }

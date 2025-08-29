@@ -145,14 +145,14 @@ pub fn Canvas(
                 let current_pos = pc.closest_grid_index_from_point(pos);
                 
                 match current_tool {
-                    DrawingTool::Pen(x) => {
+                    DrawingTool::Pen(color) => {
                         // Draw line from last position to current position
-                        log!("line drawing of color {x:?}");
+                        log!("line drawing of color {color:?}");
                         //pc.pixel_draw(current_pos,PixelColor::BLACK);
-                        pc.line_draw(last_position, current_pos,x);
+                        pc.line_draw(last_position, current_pos,color);
                         unsafe {
                             PEN_TOUCHED=true;
-                            if x==PixelColor::GREEN{GREEN_TOUCHED=true;}
+                            if color==PixelColor::GREEN{GREEN_TOUCHED=true;}
                         }
                         assert!(!pc.is_drawing_transperent());
     
@@ -165,6 +165,11 @@ pub fn Canvas(
                             GREEN_TOUCHED=false;
                         }
                         pc.line_draw(last_position, current_pos,PixelColor::ERASE);
+                    }
+                    DrawingTool::BucketFill(color)=>{
+                        log!("Bucket fill");
+                        unsafe{if color==PixelColor::GREEN{GREEN_TOUCHED=true;}}
+                        pc.bucket_draw(current_pos,color);
                     }
                 }
             });
