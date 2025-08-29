@@ -1,7 +1,116 @@
-use std::ops::Index;
+use std::ops::{BitAndAssign, BitOrAssign, BitXorAssign, Index, Not};
 
 use bitvec::prelude::*;
 type RawBitVec = BitVec<u8, Lsb0>;
+type RawBitSlice = BitSlice<u8, Lsb0>;
+
+/// Computes per-bit f(a0, a1, r1) = 0 if (a1 = 0 and r1 = 1), else (a0 OR a1)
+///
+/// Boolean expression per bit:
+/// ```text
+/// f = ¬(¬a1 ∧ r1) ∧ (a0 ∨ a1)
+///    ≡ a1 ∨ (a0 ∧ ¬r1)
+/// ```
+/// Simplified: **f = a1 | (a0 & !r1)**
+///
+/// # Panics
+/// Panics if the input slices have different lengths.
+///
+/// # Examples
+/// ```
+/// use bitvec::prelude::*;
+/// let a0 = bitvec![0, 1, 0, 1];
+/// let a1 = bitvec![0, 0, 1, 1];
+/// let r1 = bitvec![1, 0, 1, 0];
+/// let out = custom_bits(&a0, &a1, &r1);
+/// assert_eq!(out, bitvec![0, 1, 1, 1]);
+/// ```
+fn alpha_bits(
+    a0: &BitSlice<u8, Lsb0>,
+    a1: &BitSlice<u8, Lsb0>,
+    r1: &BitSlice<u8, Lsb0>,
+) -> BitVec<u8, Lsb0> {
+    assert_eq!(a0.len(), a1.len());
+    assert_eq!(a0.len(), r1.len());
+
+    let mut out = a1.to_bitvec(); // start with a1
+    let mut tmp = a0.to_bitvec(); // copy a0
+
+    // invert r1 bits
+    tmp &= !r1.to_bitvec(); // tmp = a0 & !r1
+    out |= tmp; // out = a1 | (a0 & !r1)
+
+    out
+}
+
+/// Returns `a` if `c` is 0 (false), else selects `b`.
+///
+/// # Panics
+/// - if lengths don’t match.
+///
+/// # Examples
+/// ```
+/// use bitvec::prelude::*;
+/// let a = bitvec![0, 1, 0, 1];
+/// let b = bitvec![1, 1, 0, 0];
+/// let c = bitvec![0, 1, 0, 0];
+/// let out = select_bits(&a, &b, &c);
+/// assert_eq!(out, bitvec![0, 1, 0, 1]);
+/// ```
+fn select_bits(
+    a: &BitSlice<u8, Lsb0>,
+    b: &BitSlice<u8, Lsb0>,
+    c: &BitSlice<u8, Lsb0>,
+) -> BitVec<u8, Lsb0> {
+    assert_eq!(a.len(), b.len());
+    assert_eq!(a.len(), c.len());
+
+    let mut ans = a.to_bitvec();
+    ans ^= b.to_bitvec();
+    ans &= c.to_bitvec();
+    ans ^= a.to_bitvec();
+
+    ans
+}
+
+/// Returns `a` if `c` is 0, else returns `a & !b`.
+///
+/// # Panics
+/// - if lengths don’t match.
+///
+/// # Examples
+/// ```
+/// use bitvec::prelude::*;
+/// let a = bitvec![1, 1, 0, 1];
+/// let b = bitvec![0, 1, 1, 0];
+/// let c = bitvec![0, 1, 0, 1];
+/// let out = erase_bit(&a, &b, &c);
+/// assert_eq!(out, bitvec![1, 0, 0, 1]);
+/// ```
+fn erase_bit(
+    a: &BitSlice<u8, Lsb0>,
+    b: &BitSlice<u8, Lsb0>,
+    c: &BitSlice<u8, Lsb0>,
+) -> BitVec<u8, Lsb0> {
+    assert_eq!(a.len(), b.len());
+    assert_eq!(a.len(), c.len());
+
+    let mut result = a.to_bitvec();
+
+    // compute c & b in-place, store it in a temp BitVec
+    let mut cb = c.to_bitvec();
+    cb &= b.to_bitvec();
+
+    // invert cb: now contains !(c & b)
+    cb = !cb;
+
+    // apply mask: result &= cb
+    result &= cb;
+
+    result
+}
+// Note: depending on availability of `bitnot_assign()` on BitVec, you may need to invert per-bit by `!` mapping or manually.
+/// erase_bit ans=a if !c else a & ~b
 /// A 2D matrix of bits (true = black, false = white).
 #[derive(Clone, Debug)]
 pub struct BitMatrix {
@@ -51,8 +160,12 @@ impl BitMatrix {
     pub fn as_bytes(&self) -> &BitSlice<u8> {
         &self.data
     }
-    pub fn assign_bytes(&mut self, bit_vec: RawBitVec) -> Result<(), String> {
-        if self.data.len() == bit_vec.len() {
+
+    /// truncate the bitvec if the size is bugger than necessary.
+    pub fn assign_bits(&mut self, bit_vec: RawBitVec) -> Result<(), String> {
+        let mut bit_vec = bit_vec;
+        if self.data.len() <= bit_vec.len() {
+            bit_vec.truncate(self.data.len());
             self.data = bit_vec;
             return Ok(());
         }
@@ -64,7 +177,7 @@ impl BitMatrix {
     }
     /// #Safety
     /// bit_vec must be equal to data vec size
-    unsafe fn assign_bytes_unchecked(&mut self, bit_vec: RawBitVec) {
+    unsafe fn assign_bits_unchecked(&mut self, bit_vec: RawBitVec) {
         self.data = bit_vec;
     }
 
@@ -82,6 +195,21 @@ impl BitMatrix {
     fn area(&self) -> usize {
         self.data.len()
     }
+    /// Required bytes to load the pixel values
+    pub fn required_bytes(&self) -> usize {
+        let area = self.area();
+        (area + 7) / 8
+    }
+    pub fn from_bytes<'a>(&mut self, bytes: &'a [u8]) -> Result<&'a [u8], String> {
+        let Some((head, tail)) = bytes.split_at_checked(self.required_bytes()) else {
+            return Err("bytes are of less sized to convert".to_owned());
+        };
+        self.assign_bits(RawBitVec::from_slice(head)).unwrap();
+        Ok(tail)
+    }
+    pub fn to_bytes(&self) -> &[u8] {
+        self.data.as_raw_slice()
+    }
 }
 
 impl Index<(usize, usize)> for BitMatrix {
@@ -98,26 +226,20 @@ pub struct PixelColor {
     b: bool,
     a: bool,
 }
-/// High-level drawing API for black/white pixel canvas
-#[derive(Clone, Debug)]
-pub struct DrawingPixelCanvas {
-    array0: BitMatrix,
-    array1: BitMatrix,
-    array2: BitMatrix,
-}
 
 impl PixelColor {
-    pub const ALPHA: PixelColor = PixelColor::new(true, true, true, false);
-    pub const BLACK: PixelColor = PixelColor::new(false, false, false, false);
-    pub const fn new(r: bool, g: bool, b: bool, a: bool) -> self {
+    pub const ALPHA: PixelColor = PixelColor::new(false, false, false, false);
+    pub const BLACK: PixelColor = PixelColor::new(false, false, false, true);
+    pub const ERASE: PixelColor = PixelColor::new(true, false, false, false);
+    pub const fn new(r: bool, g: bool, b: bool, a: bool) -> Self {
         Self { r, g, b, a }
     }
-    pub const fn color(r: bool, g: bool, b: bool) -> self {
+    pub const fn color(r: bool, g: bool, b: bool) -> Self {
         Self { r, g, b, a: false }
     }
     pub fn to_rgb(&self) -> &'static str {
-        if self.a {
-            return "#ffffff";
+        if !self.a {
+            return "#dddddd";
         }
         match (self.r, self.g, self.b) {
             (false, false, false) => "#000000", // Black
@@ -127,54 +249,96 @@ impl PixelColor {
             (true, true, false) => "#ffff00",   // Yellow
             (true, false, true) => "#ff00ff",   // Magenta
             (false, true, true) => "#00ffff",   // Cyan
-            (true, true, true) => "#ffffff",    // White (transperant)
+            (true, true, true) => "#ffffff",    // White
         }
     }
-    pub fn is_alpha(&self) -> bool {
-        self.r & self.g & self.b
+    pub fn is_transperent(&self) -> bool {
+        !self.a
+    }
+    pub fn is_eraser(&self) -> bool {
+        *self
+            == Self {
+                r: true,
+                g: false,
+                b: false,
+                a: false,
+            }
     }
 }
+/// High-level drawing API for black/white pixel canvas
+#[derive(Clone, Debug)]
+pub struct DrawingPixelCanvas {
+    r_array: BitMatrix,
+    g_array: BitMatrix,
+    b_array: BitMatrix,
+    a_array: BitMatrix,
+}
+
 impl DrawingPixelCanvas {
     pub fn new(width: usize, height: usize) -> Self {
         DrawingPixelCanvas {
-            array0: BitMatrix::new(width, height, true),
-            array1: BitMatrix::new(width, height, true),
-            array2: BitMatrix::new(width, height, true),
+            r_array: BitMatrix::new(width, height, false),
+            g_array: BitMatrix::new(width, height, false),
+            b_array: BitMatrix::new(width, height, false),
+            a_array: BitMatrix::new(width, height, false),
         }
     }
-    pub fn size(&self) -> (usize, usize) {
-        self.array0.dimensions()
+    pub fn dimension(&self) -> (usize, usize) {
+        self.r_array.dimensions()
     }
-
     /// Draw a single pixel (true = black, false = white).
     pub fn draw_pixel(&mut self, x: usize, y: usize, color: PixelColor) {
-        let _ = self.array0.set(x, y, color.r);
-        let _ = self.array1.set(x, y, color.g);
-        let _ = self.array2.set(x, y, color.b);
+        self.r_array.set(x, y, color.r);
+        self.g_array.set(x, y, color.g);
+        self.b_array.set(x, y, color.b);
+        self.a_array.set(x, y, color.a);
+    }
+    pub fn merge_top(&mut self, top_layer: &Self) {
+        assert!(self.dimension() == top_layer.dimension());
+        self.r_array
+            .assign_bits(select_bits(
+                self.r_array.as_bytes(),
+                top_layer.r_array.as_bytes(),
+                self.a_array.as_bytes(),
+            ))
+            .unwrap();
+        self.g_array
+            .assign_bits(select_bits(
+                self.g_array.as_bytes(),
+                top_layer.g_array.as_bytes(),
+                self.a_array.as_bytes(),
+            ))
+            .unwrap();
+        self.b_array
+            .assign_bits(select_bits(
+                self.b_array.as_bytes(),
+                top_layer.b_array.as_bytes(),
+                self.a_array.as_bytes(),
+            ))
+            .unwrap();
+        // TODO: Can be optimized later maybe.
+        self.a_array
+            .assign_bits(alpha_bits(
+                self.a_array.as_bytes(),
+                top_layer.a_array.as_bytes(),
+                top_layer.r_array.as_bytes(),
+            ))
+            .unwrap();
     }
     pub fn layer_overlay(&self, top_layer: &Self) -> DrawingPixelCanvas {
         let mut main = self.clone();
         main.merge_top(top_layer);
         main
     }
-    pub fn merge_top(&mut self, top_layer: &Self) {
-        let (width, height) = self.array0.dimensions();
-        for y in 0..height {
-            for x in 0..width {
-                let top_pixel = top_layer.get_pixel(x, y);
-                if !top_pixel.is_alpha() {
-                    self.draw_pixel(x, y, top_pixel);
-                }
-            }
-        }
-    }
+
     /// returns pixel value,
     /// alpha value if out of bound
     pub fn get_pixel(&self, x: usize, y: usize) -> PixelColor {
-        let r = self.array0.get(x, y).unwrap_or(true);
-        let g = self.array1.get(x, y).unwrap_or(true);
-        let b = self.array2.get(x, y).unwrap_or(true);
-        PixelColor { r, g, b }
+        let r = self.r_array.get(x, y).unwrap_or(false);
+        let g = self.g_array.get(x, y).unwrap_or(false);
+        let b = self.b_array.get(x, y).unwrap_or(false);
+        let a = self.b_array.get(x, y).unwrap_or(false);
+        PixelColor { r, g, b, a }
     }
     /// Draw a line using Bresenham's algorithm.
     pub fn draw_line(&mut self, x0: usize, y0: usize, x1: usize, y1: usize, color: PixelColor) {
@@ -209,18 +373,19 @@ impl DrawingPixelCanvas {
 
     /// Clear canvas (white background)
     pub fn clear(&mut self) {
-        self.array0.set_to_one();
-        self.array1.set_to_one();
-        self.array2.set_to_one();
+        self.r_array.clear();
+        self.g_array.clear();
+        self.b_array.clear();
+        self.a_array.clear();
     }
 
     /// For debugging: dump as ASCII art
     pub fn to_ascii(&self) -> String {
-        let (w, h) = self.array0.dimensions();
+        let (w, h) = self.r_array.dimensions();
         let mut out = String::new();
         for y in 0..h {
             for x in 0..w {
-                out.push(if self.get_pixel(x, y).is_alpha() {
+                out.push(if self.get_pixel(x, y).is_transperent() {
                     '█'
                 } else {
                     ' '
@@ -231,45 +396,25 @@ impl DrawingPixelCanvas {
         out
     }
     pub fn to_bytes(&self) -> Vec<u8> {
-        let array0_bytes = self.array0.as_bytes().to_bitvec().into_vec();
-        let array1_bytes = self.array1.as_bytes().to_bitvec().into_vec();
-        let array2_bytes = self.array2.as_bytes().to_bitvec().into_vec();
-
-        let mut result =
-            Vec::with_capacity(array0_bytes.len() + array1_bytes.len() + array2_bytes.len());
-        result.extend_from_slice(&array0_bytes);
-        result.extend_from_slice(&array1_bytes);
-        result.extend_from_slice(&array2_bytes);
+        let mut result = Vec::with_capacity(self.r_array.area() * 3);
+        result.extend_from_slice(self.r_array.to_bytes());
+        result.extend_from_slice(self.g_array.to_bytes());
+        result.extend_from_slice(self.b_array.to_bytes());
 
         result
     }
-    pub fn assign_bytes(&mut self, data: &[u8]) -> Result<(), String> {
-        let data_bits_per_color = data.len() / 3;
-        let (width, height) = self.size();
-        let total_bits_per_color = width * height;
-        // Check if the data size is sufficient
-        if data_bits_per_color < total_bits_per_color {
-            return Err("byte data is not enough".into());
+    pub fn assign_bytes<'a>(&mut self, data: &'a [u8]) -> Result<&'a [u8], String> {
+        if self.a_array.required_bytes() * 3 <= data.len() {
+            return Err("not enough data for pixel canvas".to_owned());
         }
+        let tail = self.r_array.from_bytes(data).unwrap();
+        let tail = self.g_array.from_bytes(tail).unwrap();
+        let tail = self.b_array.from_bytes(tail).unwrap();
+        let tail = self.a_array.from_bytes(tail).unwrap();
+        Ok(tail)
+    }
 
-        // Calculate the number of bits for each array
-
-        // Split the data into three parts
-        let (data0, rest) = data.split_at(data_bits_per_color);
-        let (data1, data2) = rest.split_at(data_bits_per_color);
-
-        // Assign the bytes to each array
-        let mut array0 = RawBitVec::from_vec(data0.to_vec());
-        array0.truncate(total_bits_per_color);
-        let mut array1 = RawBitVec::from_vec(data1.to_vec());
-        array1.truncate(total_bits_per_color);
-        let mut array2 = RawBitVec::from_vec(data2.to_vec());
-        array2.truncate(total_bits_per_color);
-
-        self.array0.assign_bytes(array0).unwrap();
-        self.array1.assign_bytes(array1).unwrap();
-        self.array2.assign_bytes(array2).unwrap();
-
-        Ok(())
+    pub fn get_alpha(&self) -> &BitMatrix {
+        &self.a_array
     }
 }

@@ -42,12 +42,12 @@ fn App() -> impl IntoView {
     });
     // endregion
     
-    set_interval(move ||{
-        canvas_state.update(|x|{
-            x.update_drawing();
-            send(&x.to_bytes());
-        });
-    }, Duration::from_secs_f32(1.0/4.0));
+    //set_interval(move ||{
+    //    canvas_state.update(|x|{
+    //        x.update_drawing();
+    //        send(&x.to_bytes());
+    //    });
+    //}, Duration::from_secs_f32(1.0/4.0));
     view! {
         <div class="app">
             <ToolbarWithTrigger selected_tool=selected_tool />

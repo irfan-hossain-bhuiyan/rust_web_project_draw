@@ -1,4 +1,5 @@
 use frontend::prelude::PixelColor;
+use leptos::logging::log;
 use web_sys::CanvasRenderingContext2d;
 
 use crate::prelude::{
@@ -9,7 +10,7 @@ use crate::prelude::{
 pub const PIXEL_SIZE: f64 = 30.0;
 pub const GAP: f64 = 4.0;
 pub const BORDER_RADIUS: f64 = 5.0;
-pub const GRID_SIZE: usize = 100;
+pub const GRID_SIZE: usize = 10;
 pub const PIXEL_FILL_COLOR: &str = "#dddddd";
 pub const PIXEL_HOVER_COLOR: &str = "#bbbbbb";
 pub const PIXEL_STROKE_COLOR: &str = "#111111";
@@ -60,7 +61,7 @@ impl PixelCanvas {
     }
 
     /// Get mutable reference to drawing canvas
-    pub fn assign_pixel_bytes(&mut self, data: &[u8]) -> Result<(), String> {
+    pub fn assign_pixel_bytes<'a>(&mut self, data: &'a[u8]) -> Result<&'a[u8], String> {
         self.main_canvas.assign_bytes(data)
     }
     pub fn update_drawing(&mut self){
@@ -79,6 +80,8 @@ impl PixelCanvas {
     pub fn line_draw(&mut self, pos1: GridIndex, pos2: GridIndex, color: PixelColor) {
         self.drawing_canvas
             .draw_line(pos1.x, pos1.y, pos2.x, pos2.y, color);
+
+        log!("{}",self.drawing_canvas.to_ascii());
     }
     pub fn set_position(&mut self, x: f64, y: f64) {
         self.position = Position::new(x, y);
@@ -109,7 +112,7 @@ impl PixelCanvas {
         let scaled_pixel_size = PIXEL_SIZE * self.zoom;
         let scaled_gap = GAP * self.zoom;
         let scaled_border_radius = BORDER_RADIUS * self.zoom;
-        let rendered_canvas = self.rendered_canvas();
+        let rendered_canvas = self.drawing_canvas.clone();
         // Set up stroke properties once
         context.set_stroke_style_str(PIXEL_STROKE_COLOR);
         context.set_line_width(PIXEL_LINE_WIDTH);

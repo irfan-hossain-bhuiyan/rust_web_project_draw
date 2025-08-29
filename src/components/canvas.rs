@@ -1,10 +1,7 @@
 use frontend::prelude::PixelColor;
 use leptos::html;
-use leptos::logging;
-use leptos::logging::error;
 use leptos::logging::log;
 use leptos::prelude::*;
-use leptos::server;
 use leptos::{ev, leptos_dom::helpers::window_event_listener};
 use wasm_bindgen::JsCast;
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
@@ -149,10 +146,12 @@ pub fn Canvas(
                     DrawingTool::Pen => {
                         // Draw line from last position to current position
                         pc.line_draw(last_position, current_pos,PixelColor::BLACK);
+                        log!("Line drawing");
                     }
                     DrawingTool::Eraser => {
                         // Erase line from last position to current position
-                        pc.line_draw(last_position, current_pos,PixelColor::ALPHA);
+                        pc.line_draw(last_position, current_pos,PixelColor::ERASE);
+                        log!("Line erasing");
                     }
                 }
             });

@@ -89,7 +89,7 @@ impl AppState {
         let mut err = dx + dy;
 
         loop {
-            if x0 >= 0 && y0 >= 0 && x0 < 100 && y0 < 100 {
+            if x0 >= 0 && y0 >= 0 && x0 < GRID_SIZE && y0 < 100 {
                 canvas.set_pixel(x0 as usize, y0 as usize, is_black);
             }
 
