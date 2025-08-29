@@ -39,16 +39,6 @@ body {
 }
 
 /* Hover trigger area */
-.toolbar-trigger {
-    position: fixed;
-    /*background: rgba(100,100,100,1);*/
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 20%; /* height of the area where mouse triggers toolbar */
-    z-index: 999;
-    pointer-events: all;
-}
 /* Show toolbar on hover near top of screen */
 /* Trigger area for hover */
 .toolbar-container::before {

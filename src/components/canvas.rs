@@ -144,11 +144,11 @@ pub fn Canvas(
                 let current_pos = pc.closest_grid_index_from_point(pos);
                 
                 match current_tool {
-                    DrawingTool::Pen => {
+                    DrawingTool::Pen(x) => {
                         // Draw line from last position to current position
                         log!("pixel drawing.");
                         //pc.pixel_draw(current_pos,PixelColor::BLACK);
-                        pc.line_draw(last_position, current_pos,PixelColor::BLACK);
+                        pc.line_draw(last_position, current_pos,x);
                         unsafe {PEN_TOUCHED=true;}
                         assert!(!pc.is_drawing_transperent());
     
