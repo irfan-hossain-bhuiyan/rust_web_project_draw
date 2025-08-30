@@ -15,7 +15,7 @@ use crate::{
 pub const PIXEL_SIZE: f64 = 30.0;
 pub const GAP: f64 = 4.0;
 pub const BORDER_RADIUS: f64 = 5.0;
-pub const DEFAULT_GRID_SIZE: usize = 100;
+pub const DEFAULT_GRID_SIZE: usize = 10;
 pub const PIXEL_FILL_COLOR: &str = "#dddddd";
 pub const PIXEL_HOVER_COLOR: &str = "#bbbbbb";
 pub const PIXEL_STROKE_COLOR: &str = "#111111";
@@ -77,7 +77,7 @@ impl PixelCanvas {
         self.main_canvas.to_bytes()
     }
     pub fn is_drawing_transperent(&self) -> bool {
-        self.drawing_canvas.is_transpernet_debug()
+        self.rendered_canvas().is_transpernet_debug()
     }
     pub fn grid_dimension(&self) -> (usize, usize) {
         self.main_canvas.dimension()
@@ -94,7 +94,7 @@ impl PixelCanvas {
     }
     
     pub fn pixel_draw(&mut self, pos: GridIndex, color: PixelColor) {
-        self.drawing_canvas.draw_pixel(pos.x, pos.y, color);
+        self.drawing_canvas.draw_pixel_ignore(pos.x, pos.y, color);
         log!(
             "pixel color after drawing: {:?} in index {pos:?}",
             self.drawing_canvas.get_pixel(pos.x, pos.y)
@@ -116,7 +116,7 @@ impl PixelCanvas {
         self.clamp_position();
     }
     fn clamp_position(&mut self) {
-        let max_pos = Position::zero();
+        let max_pos = Position::ZERO;
         let min_pos = Position::from(get_window_size().into_vec2() - self.get_size().into_vec2());
         let min_pos = min_pos.pos_clamp(max_pos, false, false);
         self.position = self

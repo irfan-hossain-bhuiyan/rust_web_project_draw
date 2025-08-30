@@ -1,4 +1,7 @@
-use std::{collections::VecDeque, ops::{BitAndAssign, BitOr, BitOrAssign, BitXorAssign, Index, Not}};
+use std::{
+    collections::VecDeque,
+    ops::{BitAndAssign, BitOr, BitOrAssign, BitXorAssign, Index, Not},
+};
 
 use bitvec::prelude::*;
 use leptos::logging::log;
@@ -28,10 +31,10 @@ pub fn select_bits(
     assert_eq!(a.len(), c.len());
     // A ^ (C & (A ^ B))  -- fewer temporaries and correct
     let mut out = a.to_bitvec();
-    let mut tmp = out.clone();       // tmp = A
-    tmp ^= b;                       // tmp = A ^ B
-    tmp &= c.to_bitvec();           // tmp = (A ^ B) & C
-    out ^= tmp;                     // out = A ^ tmp = A ^ ((A^B)&C) -> desired
+    let mut tmp = out.clone(); // tmp = A
+    tmp ^= b; // tmp = A ^ B
+    tmp &= c.to_bitvec(); // tmp = (A ^ B) & C
+    out ^= tmp; // out = A ^ tmp = A ^ ((A^B)&C) -> desired
     out
 }
 // Note: depending on availability of `bitnot_assign()` on BitVec, you may need to invert per-bit by `!` mapping or manually.
@@ -319,12 +322,14 @@ impl DrawingPixelCanvas {
             && self.a_array.as_bytes() == other.a_array.as_bytes()
     }
     /// Draw a single pixel (true = black, false = white).
-    pub fn draw_pixel(&mut self, x: usize, y: usize, color: PixelColor) {
-        self.r_array.set(x, y, color.r).unwrap();
-        self.g_array.set(x, y, color.g).unwrap();
-        self.b_array.set(x, y, color.b).unwrap();
-        self.a_array.set(x, y, color.a).unwrap();
-        assert_eq!(self.a_array.get(x, y), Some(color.a))
+    pub fn draw_pixel_ignore(&mut self, x: usize, y: usize, color: PixelColor) {
+        let _ = self.r_array.set(x, y, color.r);
+        let _ = self.g_array.set(x, y, color.g);
+        let _ = self.b_array.set(x, y, color.b);
+        let _ = self.a_array.set(x, y, color.a);
+        if let Some(x)=self.a_array.get(x,y){
+            assert_eq!(x,color.a);
+        }
     }
     pub fn is_transpernet_debug(&self) -> bool {
         !self.a_array.as_bytes().any()
@@ -358,7 +363,7 @@ impl DrawingPixelCanvas {
         while let Some((x, y)) = queue.pop_front() {
             // Only fill if pixel matches the target color
             if reference_canvas.get_pixel(x, y) == target_color {
-                self.draw_pixel(x, y, new_color);
+                self.draw_pixel_ignore(x, y, new_color);
 
                 // 4-connected neighbors
                 let neighbors = [
@@ -403,16 +408,16 @@ impl DrawingPixelCanvas {
 
                 if top == PixelColor::ERASE {
                     // special erase: clear this pixel
-                    self.draw_pixel(x, y, PixelColor::ALPHA);
+                    self.draw_pixel_ignore(x, y, PixelColor::ALPHA);
                 } else if top.a {
                     // normal blending: replace bottom with top
-                    self.draw_pixel(x, y, top);
+                    self.draw_pixel_ignore(x, y, top);
                 }
                 // else: leave bottom unchanged
             }
         }
     }
-    
+
     pub fn layer_overlay(&self, top_layer: &Self) -> DrawingPixelCanvas {
         let mut main = self.clone();
         main.merge_top(top_layer);
@@ -438,7 +443,7 @@ impl DrawingPixelCanvas {
     /// Draw a line using Bresenham's algorithm.
     pub fn draw_line(&mut self, x0: usize, y0: usize, x1: usize, y1: usize, color: PixelColor) {
         if (x0, y0) == (x1, y1) {
-            self.draw_pixel(x0, y0, color);
+            self.draw_pixel_ignore(x0, y0, color);
             return;
         }
 
@@ -452,13 +457,8 @@ impl DrawingPixelCanvas {
 
         loop {
             if x0 >= 0 && y0 >= 0 {
-                self.draw_pixel(x0 as usize, y0 as usize, color);
-                assert_eq!(
-                    self.get_pixel_checked(x0 as usize, y0 as usize),
-                    Some(color)
-                );
-            }
-
+                self.draw_pixel_ignore(x0 as usize, y0 as usize, color);
+        }
             if x0 == x1 && y0 == y1 {
                 break;
             }

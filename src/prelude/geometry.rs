@@ -6,10 +6,10 @@ pub struct Vec2 {
 }
 
 impl Vec2 {
-    pub fn new(x: f64, y: f64) -> Self {
+    pub const fn new(x: f64, y: f64) -> Self {
         Self { x, y }
     }
-    
+
     pub fn dot(self, other: Vec2) -> f64 {
         self.x * other.x + self.y * other.y
     }
@@ -41,7 +41,10 @@ impl std::ops::Mul<f64> for Vec2 {
 pub struct Position(pub Vec2);
 
 impl Position {
-    pub fn new(x: f64, y: f64) -> Self {
+    pub const ZERO: Self = Self::new(0.0, 0.0);
+    pub const ONE: Self = Self::new(1.0, 1.0);
+
+    pub const fn new(x: f64, y: f64) -> Self {
         Self(Vec2::new(x, y))
     }
     pub fn from_vec2(v: Vec2) -> Self {
@@ -81,9 +84,6 @@ impl Position {
     pub fn offset(self, delta: Position) -> Position {
         Position(self.0 + delta.0)
     }
-    pub fn zero() -> Self {
-        Self::new(0.0, 0.0)
-    }
 }
 
 // Conversions between Position and Vec2
@@ -105,9 +105,9 @@ pub struct RectSize {
     width: f64, //height and width should always be positive
     height: f64,
 }
-impl Into<(f64,f64)> for RectSize{
-    fn into(self) -> (f64,f64) {
-        (self.width,self.height)
+impl Into<(f64, f64)> for RectSize {
+    fn into(self) -> (f64, f64) {
+        (self.width, self.height)
     }
 }
 
@@ -115,8 +115,8 @@ impl RectSize {
     pub unsafe fn new_unchecked(width: f64, height: f64) -> Self {
         Self { width, height }
     }
-    pub fn new_checked(width: f64,height: f64)->Result<Self,String>{
-        if (width>=0.0) & (height>=0.0){
+    pub fn new_checked(width: f64, height: f64) -> Result<Self, String> {
+        if (width >= 0.0) & (height >= 0.0) {
             return Ok(Self { width, height });
         }
         Err("rectsize width and height is negative".into())
@@ -187,10 +187,12 @@ impl Rectangle {
         Self { ul, dr }
     }
     pub fn from_ul_dr(ul: Position, dr: Position) -> Result<Self, String> {
-        if (ul.x()<=dr.x()) & (ul.y() <= dr.y()){
-            return Ok(Self{ ul, dr });
+        if (ul.x() <= dr.x()) & (ul.y() <= dr.y()) {
+            return Ok(Self { ul, dr });
         }
-        Err(format!("rectangle construction argument is invalid.minpos:{ul:?},max_pos:{dr:?}"))
+        Err(format!(
+            "rectangle construction argument is invalid.minpos:{ul:?},max_pos:{dr:?}"
+        ))
     }
 
     /// Create rectangle from upper-left position and size
@@ -252,7 +254,7 @@ impl Rectangle {
     pub fn expand_to_include(&mut self, other: Rectangle) {
         let ul = Position::new(self.ul.x().min(other.ul.x()), self.ul.y().min(other.ul.y()));
         let dr = Position::new(self.dr.x().max(other.dr.x()), self.dr.y().max(other.dr.y()));
-        *self = Rectangle::from_ul_dr(ul, dr).unwrap() ;
+        *self = Rectangle::from_ul_dr(ul, dr).unwrap();
     }
 
     /// Size of the rectangle
@@ -270,10 +272,20 @@ impl Rectangle {
         }
         Position::new((p.x() - self.ul.x()) / w, (p.y() - self.ul.y()) / h)
     }
+    pub fn clipped_ratio_of(&self, p: Position) -> Position {
+        let w = self.width();
+        let h = self.height();
+        if w == 0.0 || h == 0.0 {
+            return Position::new(0.0, 0.0);
+        }
+        Position::new((p.x() - self.ul.x()) / w, (p.y() - self.ul.y()) / h).rect_clamp(Rectangle {
+            ul: Position::ZERO,
+            dr: Position::ONE,
+        })
+    }
     pub fn relative_rect(&self, rect: Rectangle) -> Rectangle {
-        let ul = self.ratio_of(rect.ul);
-        let dr = self.ratio_of(rect.dr);
-        unsafe { Rectangle::from_ul_dr_unchecked(ul, dr) }
+        let ul = self.clipped_ratio_of(rect.ul);
+        let dr = self.clipped_ratio_of(rect.dr);
+        Rectangle::from_ul_dr(ul, dr).unwrap()
     }
 }
-

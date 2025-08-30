@@ -30,7 +30,7 @@ pub fn get_window_size() -> RectSize {
 }
 
 pub fn get_window_rect() -> Rectangle {
-    Rectangle::from_pos_size(Position::zero(), get_window_size())
+    Rectangle::from_pos_size(Position::ZERO, get_window_size())
 }
 
 pub struct BytesPassthrough;
