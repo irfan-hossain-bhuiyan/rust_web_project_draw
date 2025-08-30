@@ -15,7 +15,7 @@ use crate::{
 pub const PIXEL_SIZE: f64 = 30.0;
 pub const GAP: f64 = 4.0;
 pub const BORDER_RADIUS: f64 = 5.0;
-pub const GRID_SIZE: usize = 100;
+pub const DEFAULT_GRID_SIZE: usize = 100;
 pub const PIXEL_FILL_COLOR: &str = "#dddddd";
 pub const PIXEL_HOVER_COLOR: &str = "#bbbbbb";
 pub const PIXEL_STROKE_COLOR: &str = "#111111";
@@ -46,22 +46,22 @@ impl Default for PixelCanvas {
         Self {
             position: Position::new(-20.0, -20.0),
             zoom: 2.0,
-            main_canvas: DrawingPixelCanvas::new(GRID_SIZE, GRID_SIZE),
-            drawing_canvas: DrawingPixelCanvas::new(GRID_SIZE, GRID_SIZE),
-            temp_canvas: DrawingPixelCanvas::new(GRID_SIZE, GRID_SIZE),
+            main_canvas: DrawingPixelCanvas::new(DEFAULT_GRID_SIZE, DEFAULT_GRID_SIZE),
+            drawing_canvas: DrawingPixelCanvas::new(DEFAULT_GRID_SIZE, DEFAULT_GRID_SIZE),
+            temp_canvas: DrawingPixelCanvas::new(DEFAULT_GRID_SIZE, DEFAULT_GRID_SIZE),
         }
     }
 }
 
 impl PixelCanvas {
     /// Create a new PixelCanvas with specified position and zoom
-    pub fn new(x: f64, y: f64, zoom: f64) -> Self {
+    pub fn new(x: f64, y: f64, zoom: f64,size:GridIndex) -> Self {
         Self {
             position: Position::new(x, y),
             zoom,
-            main_canvas: DrawingPixelCanvas::new(GRID_SIZE, GRID_SIZE),
-            drawing_canvas: DrawingPixelCanvas::new(GRID_SIZE, GRID_SIZE),
-            temp_canvas: DrawingPixelCanvas::new(GRID_SIZE, GRID_SIZE),
+            main_canvas: DrawingPixelCanvas::new(size.x, size.y),
+            drawing_canvas: DrawingPixelCanvas::new(size.x, size.y),
+            temp_canvas: DrawingPixelCanvas::new(size.x, size.y),
         }
     }
 
@@ -242,30 +242,33 @@ impl PixelCanvas {
         self.get_unzoomed_size().scale(self.zoom)
     }
     pub fn get_unzoomed_size(&self) -> RectSize {
-        let width = (GRID_SIZE as f64) * (PIXEL_SIZE + GAP);
-        let height = (GRID_SIZE as f64) * (PIXEL_SIZE + GAP);
+        let (width,height)=self.grid_dimension();
+        let width = (width as f64) * (PIXEL_SIZE + GAP);
+        let height = (height as f64) * (PIXEL_SIZE + GAP);
 
         RectSize::new_checked(width, height).unwrap()
     }
     fn viewed_row_coloumed(&self) -> (GridIndex, GridIndex) {
         let win_rect = get_window_rect();
         let canvas_rect = self.get_rect();
+        let (width,height)=self.grid_dimension();
         let relative_rectangle = canvas_rect.relative_rect(win_rect);
         let grid_index_ul = GridIndex {
-            x: (relative_rectangle.ul().x() * GRID_SIZE as f64).floor() as usize,
-            y: (relative_rectangle.ul().y() * GRID_SIZE as f64).floor() as usize,
+            x: (relative_rectangle.ul().x() * width as f64).floor() as usize,
+            y: (relative_rectangle.ul().y() * height as f64).floor() as usize,
         };
         let grid_index_dr = GridIndex {
-            x: (relative_rectangle.dr().x() * GRID_SIZE as f64).ceil() as usize,
-            y: (relative_rectangle.dr().y() * GRID_SIZE as f64).ceil() as usize,
+            x: (relative_rectangle.dr().x() * width as f64).ceil() as usize,
+            y: (relative_rectangle.dr().y() * height as f64).ceil() as usize,
         };
         (grid_index_ul, grid_index_dr)
     }
     pub fn closest_grid_index_from_point(&self, pos: Position) -> GridIndex {
         let relative_pos = self.get_rect().ratio_of(pos).0;
+        let (width,height)=self.grid_dimension();
         GridIndex {
-            x: (GRID_SIZE as f64 * relative_pos.x).floor() as usize,
-            y: (GRID_SIZE as f64 * relative_pos.y).floor() as usize,
+            x: (width as f64 * relative_pos.x).floor() as usize,
+            y: (height as f64 * relative_pos.y).floor() as usize,
         }
     }
 }

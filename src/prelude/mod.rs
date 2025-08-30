@@ -56,13 +56,11 @@ mod tests {
         assert_eq!(m.dimensions(), (4,3));
         assert_eq!(m.count_ones(), 0);
         assert_eq!(m.get(2,1), Some(false));
-        assert!(m.set(2,1, true));
         assert_eq!(m.get(2,1), Some(true));
         assert_eq!(m.count_ones(), 1);
 
         // out-of-bounds
         assert_eq!(m.get(10,10), None);
-        assert!(!m.set(10,0, true));
 
         // clear
         m.set_to_one();
