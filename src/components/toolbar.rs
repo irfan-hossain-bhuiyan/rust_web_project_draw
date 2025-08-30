@@ -3,6 +3,7 @@ use leptos::ev;
 use leptos::html;
 use leptos::logging::log;
 use leptos::prelude::*;
+use wasm_bindgen::JsCast;
 use web_sys::MouseEvent;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -34,8 +35,8 @@ impl DrawingTool {
             DrawingTool::BucketFill(_) => "Bucket Fill",
         }
     }
-    pub fn change_color(&mut self,color:PixelColor){
-        *self=match *self {
+    pub fn change_color(&mut self, color: PixelColor) {
+        *self = match *self {
             DrawingTool::Eraser => DrawingTool::Eraser,
             DrawingTool::Pen(_) => DrawingTool::Pen(color),
             DrawingTool::BucketFill(_) => DrawingTool::BucketFill(color)
@@ -57,6 +58,43 @@ const COLORS: [(&str, PixelColor); 8] = [
 #[component]
 pub fn Toolbar(#[prop(into)] selected_tool: RwSignal<DrawingTool>) -> impl IntoView {
     let show_color_picker = RwSignal::new(false);
+    let color_picker_position = RwSignal::new((0f64, 0f64)); // (left, top) in pixels
+
+    let handle_color_picker = move |ev: MouseEvent, tool: DrawingTool| {
+        ev.prevent_default();
+        
+        // Get the button element that was right-clicked
+        if let Some(button) = ev.target().and_then(|t| {
+            // Try to get the button element (might be the button itself or a child span)
+            if let Ok(element) = t.dyn_into::<web_sys::Element>() {
+                if element.tag_name() == "BUTTON" {
+                    Some(element)
+                } else {
+                    element.closest("button").ok().flatten()
+                }
+            } else {
+                None
+            }
+        }) {
+            let rect = button.get_bounding_client_rect();
+            let toolbar_rect = button.closest(".toolbar")
+                .ok()
+                .flatten()
+                .map(|toolbar| toolbar.get_bounding_client_rect());
+            
+            if let Some(toolbar_rect) = toolbar_rect {
+                // Calculate position relative to toolbar
+                let left = rect.left() - toolbar_rect.left() + (rect.width() / 2.0) - 60.0; // Center under button, 60px is half of color picker width
+                let top = rect.bottom() - toolbar_rect.top() + 5.0; // 5px gap below button
+                
+                color_picker_position.set((left, top));
+            }
+        }
+        
+        // Set the tool and show color picker
+        selected_tool.set(tool);
+        show_color_picker.set(!show_color_picker.get());
+    };
 
     view! {
         <div class="toolbar">
@@ -75,8 +113,7 @@ pub fn Toolbar(#[prop(into)] selected_tool: RwSignal<DrawingTool>) -> impl IntoV
                         selected_tool.set(DrawingTool::Pen(PixelColor::BLACK));
                     }
                     on:contextmenu=move |ev: MouseEvent| {
-                        ev.prevent_default();
-                        show_color_picker.set(!show_color_picker.get());
+                        handle_color_picker(ev, DrawingTool::Pen(PixelColor::BLACK));
                     }
                 >
                     <span class="tool-icon">"✏️"</span>
@@ -96,9 +133,8 @@ pub fn Toolbar(#[prop(into)] selected_tool: RwSignal<DrawingTool>) -> impl IntoV
                         selected_tool.set(DrawingTool::BucketFill(PixelColor::BLACK));
                     }
                     on:contextmenu=move |ev: MouseEvent| {
-                        ev.prevent_default();
                         log!("right click pressed on bucket fill.");
-                        show_color_picker.set(!show_color_picker.get());
+                        handle_color_picker(ev, DrawingTool::BucketFill(PixelColor::BLACK));
                     }
                 >
                     <span class="tool-icon">"🪣"</span>
@@ -123,10 +159,16 @@ pub fn Toolbar(#[prop(into)] selected_tool: RwSignal<DrawingTool>) -> impl IntoV
                 </button>
             </div>
 
-            // Color picker (positioned below toolbar)
+            // Color picker (dynamically positioned)
             <div
                 class=move || if show_color_picker.get() { "color-picker show" } else { "color-picker" }
-                style="position: absolute; top: 100%; left: 0; margin-top: 5px;"
+                style=move || {
+                    let (left, top) = color_picker_position.get();
+                    format!(
+                        "position: absolute; left: {}px; top: {}px;",
+                        left, top
+                    )
+                }
             >
                 <div class="color-grid">
                     {COLORS.iter().map(|(hex, pixel_color)| {
@@ -137,7 +179,7 @@ pub fn Toolbar(#[prop(into)] selected_tool: RwSignal<DrawingTool>) -> impl IntoV
                                 class="color-button"
                                 style=move || format!("background-color: {}", hex_str)
                                 on:click=move |_| {
-                                    selected_tool.update(|x|x.change_color(color));
+                                    selected_tool.update(|x| x.change_color(color));
                                     show_color_picker.set(false);
                                 }
                             />
