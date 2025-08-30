@@ -83,8 +83,11 @@ impl PixelCanvas {
         self.main_canvas.merge_top(&self.drawing_canvas);
         self.drawing_canvas.clear();
     }
-    pub fn to_bytes(&self) -> Vec<u8> {
+    pub fn main_canvas_to_bytes(&self) -> Vec<u8> {
         self.main_canvas.to_bytes()
+    }
+    pub fn drawing_canvas_to_bytes(&self) -> Vec<u8> {
+        self.drawing_canvas.to_bytes()
     }
     pub fn is_drawing_transperent(&self) -> bool {
         self.rendered_canvas().is_transpernet_debug()
@@ -145,12 +148,6 @@ impl PixelCanvas {
         let scaled_gap = GAP * self.zoom;
         let scaled_border_radius = BORDER_RADIUS * self.zoom;
         let rendered_canvas = self.rendered_canvas(); //self.rendered_canvas();
-        if unsafe { PEN_TOUCHED } {
-            assert!(!rendered_canvas.is_transpernet_debug());
-        }
-        if unsafe { GREEN_TOUCHED } {
-            assert!(rendered_canvas.search_color(PixelColor::GREEN).is_some())
-        }
         // Set up stroke properties once
         context.set_stroke_style_str(PIXEL_STROKE_COLOR);
         context.set_line_width(PIXEL_LINE_WIDTH);

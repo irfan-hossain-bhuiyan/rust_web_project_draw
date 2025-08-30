@@ -1,6 +1,4 @@
 ## Debug:
-- line draw is not working,after updating line draw the entire canvas is empty.
-- 
 
 ## done:
 - refactor get window dimension,that is a basic function
@@ -8,7 +6,6 @@
 - for now I am making Position clamp such that the display don't get out of bound.
     - If the bound shape become relatively smaller if display is larger than pixel.
 - only render things on the screen
-    - As grid size is constant,let's make everything grid related constant.
 - change the move set of the keyboard
 - Now I think if I am using delta x and y,we can get that from function,
 Or make a function that will return delta x and delta y,that logic can be moved else where.
@@ -23,6 +20,13 @@ Or make a function that will return delta x and delta y,that logic can be moved 
 ## Working
 - having a over pop menu that will give list of tools to use
 ## Todo:
+- Moving the canvas implementation in the server side of things.
+    - having prelude to be shareble by everyone.
+- saving the state of the drawing with each of the uuid.
+- all the app state will be saved in the hashmap key being the uuid,
+- with 0.25 time the webapp will pass the data to the host,and also update drawing to main,making sure the main canvas and server 
+    is synchronous
+
 - having smooth scrolling
 - As for simplicity use axum and every time it loads entire bitset from the server and render it
 - also code for boundary,canvas not to draw edge of the canvas

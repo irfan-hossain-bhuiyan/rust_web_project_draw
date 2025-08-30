@@ -1,18 +1,29 @@
 use std::time::Duration;
 
+use bincode::config;
 use frontend::prelude::BytesPassthrough;
 // This can be empty for now or contain server-side code if you plan to use SSR later
-use leptos::{logging::{error, log}, prelude::*};
-use leptos_router::{components::{Route, Router, Routes, A}, hooks::{use_params_map, use_query_map}, path};
-use leptos_use::{self, UseWebSocketReturn, use_websocket};
+use leptos::{
+    logging::{error, log},
+    prelude::*,
+};
+use leptos_router::{
+    components::{A, Route, Router, Routes},
+    hooks::{use_params_map, use_query_map},
+    path,
+};
+use leptos_use::{self, UseWebSocketReturn, core::ConnectionReadyState, use_websocket};
 mod components;
 mod types;
 use components::{Canvas, DrawingTool};
 pub use frontend::prelude;
+use shared::DataPass;
 use uuid::Uuid;
 
-use crate::{components::toolbar::ToolbarWithTrigger, types::pixel_canvas::{GridIndex, PixelCanvas}};
-
+use crate::{
+    components::toolbar::ToolbarWithTrigger,
+    types::pixel_canvas::{GridIndex, PixelCanvas},
+};
 
 #[component]
 fn HomePage() -> impl IntoView {
@@ -82,21 +93,6 @@ fn HomePage() -> impl IntoView {
 fn DrawingPage() -> impl IntoView {
     let params = use_params_map();
     let query = use_query_map();
-
-    let session_id = params.with(|p| p.get("id")).unwrap_or_else(|| "unknown".to_string());
-    let width = query.with(|q| q.get("width").and_then(|v| v.parse().ok()).unwrap_or(100));
-    let height = query.with(|q| q.get("height").and_then(|v| v.parse().ok()).unwrap_or(100)); 
-
-    view! {
-        <div>
-            <p>{format!("Session: {}", session_id)}</p>
-            <App width=width height=height />
-        </div>
-    }
-}
-#[component]
-fn App(width:usize,height:usize) -> impl IntoView {
-    // Shared state for the selected drawing tool
     let UseWebSocketReturn {
         ready_state,
         message,
@@ -105,15 +101,98 @@ fn App(width:usize,height:usize) -> impl IntoView {
         close,
         send,
         ..
-    } = use_websocket::<Vec<u8>, Vec<u8>, BytesPassthrough>("127.0.0.1:8081");
+    } = use_websocket::<Vec<u8>, Vec<u8>, BytesPassthrough>("ws://127.0.0.1:8081");
 
+    let session_id = params
+        .with(|p| p.get("id"))
+        .unwrap_or_else(|| "unknown".to_string());
+    let width: usize = query.with(|q| q.get("width").and_then(|v| v.parse().ok()).unwrap_or(100));
+    let height: usize = query.with(|q| q.get("height").and_then(|v| v.parse().ok()).unwrap_or(100));
+    let data = DataPass::Whid {
+        width,
+        height,
+        id: session_id.clone(),
+    };
+    let buf = bincode::serde::encode_to_vec(&data, bincode::config::standard()).unwrap();
+    let sent = RwSignal::new(false);
+    let send_c = send.clone();
+    Effect::new(move |_| {
+        if !sent.get() && ready_state.get() == ConnectionReadyState::Open {
+            match bincode::serde::encode_to_vec(&data, bincode::config::standard()) {
+                Ok(buf) => {
+                    log!("Connection established! Sending data:");
+                    log!("width: {width}, height: {height}");
+                    log!("encoded data: {buf:?}");
+                    send_c(&buf);
+                    sent.set(true); // Mark as sent
+                }
+                Err(e) => {
+                    log!("Failed to encode data: {e:?}");
+                }
+            }
+        }
+    });
+    log!(
+        "
+        now width is {width},
+        height is {height},
+        new send from {buf:?}"
+    );
+    view! {
+        <div>
+            <p>{format!("Session: {session_id}")}</p>
+            <App width=width height=height message=message send=send ready_state=ready_state/>
+        </div>
+    }
+}
+#[component]
+fn App(
+    width: usize,
+    height: usize,
+    message: Signal<Option<Vec<u8>>>,
+    send: impl Fn(&Vec<u8>) + Clone + Send + Sync + 'static,
+    ready_state: Signal<ConnectionReadyState>,
+) -> impl IntoView {
+    // Shared state for the selected drawing tool
+    let send_c = send.clone();
     let selected_tool = RwSignal::new(DrawingTool::default());
-    let canvas_state = RwSignal::new(PixelCanvas::new_in_middle(GridIndex{
-        x:width,
-        y:height
+    let canvas_state = RwSignal::new(PixelCanvas::new_in_middle(GridIndex {
+        x: width,
+        y: height,
     }));
 
-    // region canvas input update
+    //region outgoing call
+    //Effect::new(move || {
+    //    if ready_state.get() == ConnectionReadyState::Open {
+    //        let bytes = canvas_state.get().main_canvas_to_bytes();
+    //        let bytes = bincode::serde::encode_to_vec(
+    //            &DataPass::Canvas { data: bytes },
+    //            config::standard(),
+    //        )
+    //        .unwrap();
+    //        send_c(&bytes);
+    //    }
+    //});
+    let send_c=send.clone();
+    set_interval(
+        move || {
+            let bytes = canvas_state.get().drawing_canvas_to_bytes();
+            let bytes = bincode::serde::encode_to_vec(
+                &DataPass::Canvas { data: bytes },
+                config::standard(),
+            )
+            .unwrap();
+            send_c(&bytes);
+
+            canvas_state.update(|x| {
+                x.update_drawing();
+            });
+        },
+        Duration::from_secs_f32(1.0 / 4.0),
+    );
+
+    //endregion
+    // region canvas ingoing call
     Effect::new(move || {
         let Some(bin_data) = message.get() else {
             log!("Signal is null");
@@ -126,13 +205,7 @@ fn App(width:usize,height:usize) -> impl IntoView {
         });
     });
     // endregion
-    
-    set_interval(move ||{
-        canvas_state.update(|x|{
-            x.update_drawing();
-            send(&x.to_bytes());
-        });
-    }, Duration::from_secs_f32(1.0/4.0));
+
     view! {
         <div class="app">
             <ToolbarWithTrigger selected_tool=selected_tool />
@@ -152,7 +225,6 @@ fn Root() -> impl IntoView {
         </Router>
     }
 }
-
 
 fn main() {
     console_error_panic_hook::set_once();

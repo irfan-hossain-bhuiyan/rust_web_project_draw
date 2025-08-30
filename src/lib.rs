@@ -1,1 +1,2 @@
-pub mod prelude;
+pub use shared as prelude;
+

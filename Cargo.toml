@@ -20,5 +20,6 @@ leptos-use = "0.16.2"
 codee = "0.3.2"
 leptos_router = "0.8.6"
 uuid = { version = "1.18.0", features = ["js", "v4"] }
-
+shared = {path= "../shared"}
+bincode = { version = "2.0.1", features = ["serde"] }
 
