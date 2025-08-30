@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use frontend::prelude::{BitMatrix, PixelColor};
+use frontend::prelude::{BitMatrix, PixelColor, Vec2};
 use leptos::logging::log;
 use web_sys::CanvasRenderingContext2d;
 
@@ -15,7 +15,7 @@ use crate::{
 pub const PIXEL_SIZE: f64 = 30.0;
 pub const GAP: f64 = 4.0;
 pub const BORDER_RADIUS: f64 = 5.0;
-pub const DEFAULT_GRID_SIZE: usize = 10;
+pub const DEFAULT_GRID_SIZE: usize = 100;
 pub const PIXEL_FILL_COLOR: &str = "#dddddd";
 pub const PIXEL_HOVER_COLOR: &str = "#bbbbbb";
 pub const PIXEL_STROKE_COLOR: &str = "#111111";
@@ -64,7 +64,17 @@ impl PixelCanvas {
             temp_canvas: DrawingPixelCanvas::new(size.x, size.y),
         }
     }
-
+    pub fn new_in_middle(size:GridIndex)->Self{
+        let mut ans= Self::new(0.0, 0.0, 1.0, size);
+        ans.in_middle();
+        ans
+    }
+    pub fn in_middle(&mut self)->&mut Self{
+        let size=self.get_size().into_vec2();
+        let window_size=get_window_size().into_vec2();
+        self.position=Position::from((window_size-size)*0.5);
+        self
+    }
     /// Get mutable reference to drawing canvas
     pub fn assign_pixel_bytes<'a>(&mut self, data: &'a [u8]) -> Result<&'a [u8], String> {
         self.main_canvas.assign_bytes(data)
@@ -116,8 +126,10 @@ impl PixelCanvas {
         self.clamp_position();
     }
     fn clamp_position(&mut self) {
-        let max_pos = Position::ZERO;
-        let min_pos = Position::from(get_window_size().into_vec2() - self.get_size().into_vec2());
+        let window_size=get_window_size().into_vec2();
+        let boundary=Vec2::new(PIXEL_SIZE, PIXEL_SIZE)*3.0;
+        let max_pos = Position::from_vec2(window_size- boundary);
+        let min_pos = Position::from(boundary- self.get_size().into_vec2());
         let min_pos = min_pos.pos_clamp(max_pos, false, false);
         self.position = self
             .position
@@ -225,11 +237,12 @@ impl PixelCanvas {
     /// Zoom in/out from a specific point (keeping that point stationary)
     pub fn zoom_at_point(&mut self, factor: f64, point_x: f64, point_y: f64) {
         // Apply zoom
+        let previous_zoom=self.zoom;
         self.zoom *= factor;
         self.zoom_clamp();
 
         // Calculate the actual zoom change after clamping
-        let actual_zoom_change = factor;
+        let actual_zoom_change = self.zoom/previous_zoom;
         // Adjust position to keep the point under cursor stationary
         // Formula: new_pos = point - (point - old_pos) * zoom_ratio
         let new_x = point_x - (point_x - self.position.x()) * actual_zoom_change;
@@ -237,7 +250,7 @@ impl PixelCanvas {
         self.position = Position::new(new_x, new_y);
         self.clamp_position();
     }
-    /// Get the total canvas dimensions needed for this grid
+    /// get actual size aftet the zooming
     pub fn get_size(&self) -> RectSize {
         self.get_unzoomed_size().scale(self.zoom)
     }
