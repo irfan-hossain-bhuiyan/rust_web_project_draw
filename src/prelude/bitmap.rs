@@ -333,18 +333,20 @@ impl DrawingPixelCanvas {
         &mut self,
         start_x: usize,
         start_y: usize,
-        color: PixelColor,
-        boundary_canvas: &DrawingPixelCanvas,
+        new_color: PixelColor,
+        reference_canvas: &DrawingPixelCanvas,
     ) {
         let (w, h) = self.dimension();
 
-        // if starting point is outside canvas -> nothing
         if start_x >= w || start_y >= h {
             return;
         }
 
-        // Do not fill if start is on a boundary
-        if boundary_canvas.get_pixel(start_x, start_y).a {
+        // Get the target color (the region to replace)
+        let target_color = reference_canvas.get_pixel(start_x, start_y);
+
+        // If target color == new color, no need to fill
+        if target_color == new_color {
             return;
         }
 
@@ -354,21 +356,20 @@ impl DrawingPixelCanvas {
         visited.set(start_x, start_y, true).unwrap();
 
         while let Some((x, y)) = queue.pop_front() {
-            // Fill this pixel
-            self.draw_pixel(x, y, color);
+            // Only fill if pixel matches the target color
+            if reference_canvas.get_pixel(x, y) == target_color {
+                self.draw_pixel(x, y, new_color);
 
-            // Explore 4-neighbors
-            let neighbors = [
-                (x.wrapping_sub(1), y),
-                (x + 1, y),
-                (x, y.wrapping_sub(1)),
-                (x, y + 1),
-            ];
+                // 4-connected neighbors
+                let neighbors = [
+                    (x.wrapping_sub(1), y),
+                    (x + 1, y),
+                    (x, y.wrapping_sub(1)),
+                    (x, y + 1),
+                ];
 
-            for (nx, ny) in neighbors {
-                if nx < w && ny < h {
-                    // Only spread if not visited AND not boundary
-                    if !visited.get(nx, ny).unwrap() && !boundary_canvas.get_pixel(nx, ny).a {
+                for (nx, ny) in neighbors {
+                    if nx < w && ny < h && !visited.get(nx, ny).unwrap() {
                         visited.set(nx, ny, true).unwrap();
                         queue.push_back((nx, ny));
                     }
