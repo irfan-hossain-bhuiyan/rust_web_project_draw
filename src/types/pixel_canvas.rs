@@ -79,6 +79,9 @@ impl PixelCanvas {
     pub fn assign_pixel_bytes<'a>(&mut self, data: &'a [u8]) -> Result<&'a [u8], String> {
         self.main_canvas.assign_bytes(data)
     }
+    pub fn image_export(&self) -> Result<Vec<u8>, String> {
+        self.rendered_canvas().to_png_bytes()
+    }
     pub fn update_drawing(&mut self) {
         self.main_canvas.merge_top(&self.drawing_canvas);
         self.drawing_canvas.clear();
@@ -173,7 +176,7 @@ impl PixelCanvas {
                 let fill_color = if is_hovered {
                     PIXEL_HOVER_COLOR
                 } else {
-                    pixel_color.to_rgb()
+                    pixel_color.to_rgb_str()
                 };
                 context.set_fill_style_str(fill_color);
 

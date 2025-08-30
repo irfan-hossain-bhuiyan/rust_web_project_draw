@@ -208,7 +208,7 @@ fn App(
 
     view! {
         <div class="app">
-            <ToolbarWithTrigger selected_tool=selected_tool />
+            <ToolbarWithTrigger selected_tool=selected_tool canvas=canvas_state/>
             <Canvas selected_tool=selected_tool canvas_state=canvas_state/>
         </div>
     }
