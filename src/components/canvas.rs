@@ -6,11 +6,17 @@ use leptos::{ev, leptos_dom::helpers::window_event_listener};
 use wasm_bindgen::JsCast;
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
 
-use crate::types::pixel_canvas::{PixelCanvas, CANVAS_BACKGROUND_COLOR, GridIndex};
 use crate::components::DrawingTool;
+use crate::types::pixel_canvas::{CANVAS_BACKGROUND_COLOR, GridIndex, PixelCanvas};
 
-pub static mut PEN_TOUCHED:bool=false;
-pub static mut GREEN_TOUCHED:bool=false;
+pub static mut PEN_TOUCHED: bool = false;
+pub static mut GREEN_TOUCHED: bool = false;
+pub fn eraser_touched_debuged(){
+    unsafe{
+        PEN_TOUCHED=false;
+        GREEN_TOUCHED=false;
+    }
+}
 /// Get Canvas2D rendering context from canvas element
 fn get_canvas_2d_context(canvas: &HtmlCanvasElement) -> Result<CanvasRenderingContext2d, String> {
     canvas
@@ -89,16 +95,42 @@ pub fn Canvas(
                 // Left mouse button - drawing/erasing
                 let mouse_x = ev.client_x() as f64;
                 let mouse_y = ev.client_y() as f64;
-                
-                canvas_state.with(|pc| {
+                //region save drawing position and tool update
+                canvas_state.update(|pc| {
                     let pos = crate::prelude::Position::new(mouse_x, mouse_y);
                     let grid_pos = pc.closest_grid_index_from_point(pos);
-                    drawing_state.set(DrawingState::Clicked { last_position: grid_pos });
+                    drawing_state.set(DrawingState::Clicked {
+                        last_position: grid_pos,
+                    });
+
+                    let pos = crate::prelude::Position::new(mouse_x, mouse_y);
+                    let current_pos = pc.closest_grid_index_from_point(pos);
+                    match selected_tool.get() {
+                        DrawingTool::BucketFill(color) => {
+                            log!("Bucket fill");
+                            unsafe {
+                                if color == PixelColor::GREEN {
+                                    GREEN_TOUCHED = true;
+                                }
+                            }
+                            pc.bucket_draw(current_pos, color);
+                        }
+                        DrawingTool::Eraser => {
+                            log!("Eraser used");
+                            pc.pixel_draw(current_pos, PixelColor::ERASE);
+                            eraser_touched_debuged();
+                        }
+                        DrawingTool::Pen(color)=>{
+                            log!("line drawn");
+                            pc.pixel_draw(current_pos, color);
+                        }
+                    }
                 });
-                
+                //endregion
+
                 ev.prevent_default();
             }
-            _ => {} // Ignore other mouse buttons
+            _ => {ev.prevent_default();} // Ignore other mouse buttons
         }
     };
     let handle_mouseup = move |ev: web_sys::MouseEvent| {
@@ -122,7 +154,7 @@ pub fn Canvas(
         let mouse_x = ev.client_x() as f64;
         let mouse_y = ev.client_y() as f64;
         mouse_position.set(Some((mouse_x, mouse_y)));
-        
+
         // Handle panning (middle mouse drag)
         if is_dragging.get() {
             let delta_x = ev.movement_x() as f64;
@@ -135,52 +167,51 @@ pub fn Canvas(
 
             ev.prevent_default();
         }
-        
+
         // Handle drawing during mouse movement
         if let DrawingState::Clicked { last_position } = drawing_state.get() {
             let current_tool = selected_tool.get();
-            
+
             canvas_state.update(|pc| {
                 let pos = crate::prelude::Position::new(mouse_x, mouse_y);
                 let current_pos = pc.closest_grid_index_from_point(pos);
-                
+
                 match current_tool {
                     DrawingTool::Pen(color) => {
                         // Draw line from last position to current position
                         log!("line drawing of color {color:?}");
                         //pc.pixel_draw(current_pos,PixelColor::BLACK);
-                        pc.line_draw(last_position, current_pos,color);
+                        pc.line_draw(last_position, current_pos, color);
                         unsafe {
-                            PEN_TOUCHED=true;
-                            if color==PixelColor::GREEN{GREEN_TOUCHED=true;}
+                            PEN_TOUCHED = true;
+                            if color == PixelColor::GREEN {
+                                GREEN_TOUCHED = true;
+                            }
                         }
                         assert!(!pc.is_drawing_transperent());
-    
                     }
                     DrawingTool::Eraser => {
                         // Erase line from last position to current position
                         log!("Line erasing");
                         unsafe {
-                            PEN_TOUCHED=false;
-                            GREEN_TOUCHED=false;
+                            PEN_TOUCHED = false;
+                            GREEN_TOUCHED = false;
                         }
-                        pc.line_draw(last_position, current_pos,PixelColor::ERASE);
+                        pc.line_draw(last_position, current_pos, PixelColor::ERASE);
                     }
-                    DrawingTool::BucketFill(color)=>{
-                        log!("Bucket fill");
-                        unsafe{if color==PixelColor::GREEN{GREEN_TOUCHED=true;}}
-                        pc.bucket_draw(current_pos,color);
-                    }
+                    DrawingTool::BucketFill(_) => {}
                 }
             });
-            
+
             // Update last position for next draw
             canvas_state.with(|pc| {
                 let pos = crate::prelude::Position::new(mouse_x, mouse_y);
                 let current_pos = pc.closest_grid_index_from_point(pos);
-                drawing_state.set(DrawingState::Clicked { last_position: current_pos });
+                drawing_state.set(DrawingState::Clicked {
+                    last_position: current_pos,
+                });
             });
-            
+
             ev.prevent_default();
         }
     };
@@ -205,7 +236,7 @@ pub fn Canvas(
     };
     //endregion
     //endregion
-        //region canvas rendering
+    //region canvas rendering
     //region canvas initialize
     Effect::new(move |_| {
         // effect initialize things after canvas_ref get connected.
@@ -248,14 +279,14 @@ pub fn Canvas(
         let _canvas_state = canvas_state.get();
         let _mouse_pos = mouse_position.get();
         let _drawing_state = drawing_state.get(); // Add drawing state as dependency
-        
+
         if let Some(canvas) = canvas_ref.get() {
             draw(canvas)
         }
     });
     //endregion
     //endregion
-//region window resize
+    //region window resize
     use crate::prelude::get_window_size;
     window_event_listener(ev::resize, move |_| {
         web_sys::console::log_1(&"🔄 Window resize event triggered!".into());
@@ -273,8 +304,8 @@ pub fn Canvas(
     //endregion
 
     // Expanded view! macro - creating canvas element manually
-    use leptos::html::canvas;
     use leptos::IntoView;
+    use leptos::html::canvas;
     let canvas_element = canvas()
         .node_ref(canvas_ref)
         .class("fullscreen-canvas")

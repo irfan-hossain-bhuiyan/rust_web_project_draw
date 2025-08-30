@@ -17,12 +17,12 @@ Or make a function that will return delta x and delta y,that logic can be moved 
 - color the pixel somewhat greyish
 - import betset and have a 2d vector with it,
 - VIP:change the undo button from u to shift U,everytime I press enter,I go to that.
-## Working
 - initialize the canvas to start with alpha value.
 - Having a color overlay.
 - alpha value having the ability to draw over other value.
-## Todo:
+## Working
 - having a over pop menu that will give list of tools to use
+## Todo:
 - having smooth scrolling
 - As for simplicity use axum and every time it loads entire bitset from the server and render it
 - also code for boundary,canvas not to draw edge of the canvas

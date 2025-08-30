@@ -140,6 +140,18 @@ body {
     visibility: visible;
     transform: translateY(0);
 }
+/* Arrow pointing up from color picker */
+.color-picker::after {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border: 6px solid transparent;
+    border-bottom-color: rgba(0, 0, 0, 0.9);
+}
 .color-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -166,18 +178,7 @@ body {
     position: relative;
 }
 
-/* Optional: Add a small arrow pointing down from color picker */
-.color-picker::after {
-    content: '';
-    position: absolute;
-    top: 100%;
-    left: 20px;
-    width: 0;
-    height: 0;
-    border: 6px solid transparent;
-    border-top-color: rgba(0, 0, 0, 0.9);
-}
-
+/* Arrow pointing up from color picker */
 /* Responsive design */
 @media (max-width: 768px) {
     .toolbar {

@@ -84,7 +84,8 @@ pub fn Toolbar(#[prop(into)] selected_tool: RwSignal<DrawingTool>) -> impl IntoV
             
             if let Some(toolbar_rect) = toolbar_rect {
                 // Calculate position relative to toolbar
-                let left = rect.left() - toolbar_rect.left() + (rect.width() / 2.0) - 60.0; // Center under button, 60px is half of color picker width
+                let left = rect.left() - toolbar_rect.left() + (rect.width() / 2.0) - 75.0; 
+                // Center under button, 60px is half of color picker width
                 let top = rect.bottom() - toolbar_rect.top() + 5.0; // 5px gap below button
                 
                 color_picker_position.set((left, top));
@@ -165,8 +166,7 @@ pub fn Toolbar(#[prop(into)] selected_tool: RwSignal<DrawingTool>) -> impl IntoV
                 style=move || {
                     let (left, top) = color_picker_position.get();
                     format!(
-                        "position: absolute; left: {}px; top: {}px;",
-                        left, top
+                        "position: absolute; left: {left}px; top: {top}px;",
                     )
                 }
             >
@@ -177,7 +177,7 @@ pub fn Toolbar(#[prop(into)] selected_tool: RwSignal<DrawingTool>) -> impl IntoV
                         view! {
                             <button
                                 class="color-button"
-                                style=move || format!("background-color: {}", hex_str)
+                                style=move || format!("background-color: {hex_str}")
                                 on:click=move |_| {
                                     selected_tool.update(|x| x.change_color(color));
                                     show_color_picker.set(false);
